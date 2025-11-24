@@ -1,0 +1,16 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Local Environment Variables
+.env.local
+.env*.local
+
+# Build output
+.next/
+out/
+
+# Other
+.DS_Store
+*.pem
