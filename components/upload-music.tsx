@@ -17,38 +17,30 @@ interface Genre {
 
 interface UploadMusicProps {
   genres: Genre[]
-  onUploadSuccess?: (song: {
-    title: string
-    artist: string
-    genre_id: string
-    blob_url: string
-    duration: number
-  }) => void
+  onUploadSuccess?: (songs: any[]) => void
 }
 
 export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProps) {
-  const [title, setTitle] = useState("")
-  const [artist, setArtist] = useState("")
   const [genre_id, setGenreId] = useState("")
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      // Validate file type
-      if (!selectedFile.type.startsWith("audio/")) {
-        setError("Por favor selecciona un archivo de audio")
-        return
-      }
-      setFile(selectedFile)
-      setError(null)
-      // Auto-fill title from filename if empty
-      if (!title) {
-        setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""))
+    const selectedFiles = e.target.files
+    if (selectedFiles) {
+      const audioFiles = Array.from(selectedFiles).filter((file) => {
+        if (!file.type.startsWith("audio/")) {
+          setError(`El archivo "${file.name}" no es un audio y será ignorado.`)
+          return false
+        }
+        return true
+      })
+      setFiles(audioFiles)
+      if (audioFiles.length > 0) {
+        setError(null)
       }
     }
   }
@@ -57,61 +49,70 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
     e.preventDefault()
     setError(null)
 
-    if (!title || !file || !genre_id) {
-      setError("Por favor completa todos los campos requeridos")
+    if (files.length === 0 || !genre_id) {
+      setError("Por favor selecciona archivos de audio y un género")
       return
     }
 
     setIsLoading(true)
 
     try {
-      // Upload file to Blob
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      // Step 1: Upload all files to Blob storage in parallel
+      const uploadPromises = files.map((file) => {
+        const formData = new FormData()
+        formData.append("file", file)
+        return fetch("/api/upload", { method: "POST", body: formData }).then((res) => {
+          if (!res.ok) throw new Error(`Error al subir ${file.name}`)
+          return res.json()
+        })
       })
 
-      if (!uploadRes.ok) {
-        throw new Error("Error al subir el archivo")
+      const uploadedBlobs = await Promise.all(uploadPromises)
+
+      // Step 2: Get duration for each uploaded file and prepare song data
+      const songsDataPromises = uploadedBlobs.map(async (blob, index) => {
+        const audio = new Audio(blob.url)
+        const duration = await new Promise<number>((resolve) => {
+          audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
+          audio.onerror = () => resolve(0) // Resolve with 0 if duration can't be read
+        })
+
+        return {
+          title: files[index].name.replace(/\.[^/.]+$/, ""), // Title from filename
+          artist: "", // Artist can be added later
+          genre_id,
+          blob_url: blob.url,
+          duration,
+        }
+      })
+
+      const songsData = await Promise.all(songsDataPromises)
+
+      // Step 3: Send song data to be saved in the database
+      const saveRes = await fetch("/api/songs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(songsData), // Sending an array of songs
+      })
+
+      if (!saveRes.ok) {
+        throw new Error("Error al guardar las canciones en la base de datos")
       }
 
-      const { url, type } = await uploadRes.json()
+      const savedSongs = await saveRes.json()
 
-      // Get audio duration
-      const audio = new Audio(url)
-      const duration = await new Promise<number>((resolve) => {
-        audio.onloadedmetadata = () => {
-          resolve(Math.floor(audio.duration))
-        }
-        audio.onerror = () => {
-          resolve(0)
-        }
-      })
-
-      // Call success callback with song data
-      onUploadSuccess?.({
-        title,
-        artist,
-        genre_id,
-        blob_url: url,
-        duration,
-      })
+      onUploadSuccess?.(savedSongs.songs)
 
       // Reset form
-      setTitle("")
-      setArtist("")
       setGenreId("")
-      setFile(null)
+      setFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al procesar la canción")
+      setError(err instanceof Error ? err.message : "Ocurrió un error durante la subida")
     } finally {
       setIsLoading(false)
     }
@@ -121,35 +122,12 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
     <div className="rounded-lg border border-border bg-card p-6">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
         <Upload className="w-5 h-5 text-purple-600" />
-        Subir canción
+        Subir Canciones por Lote
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="title">Título de la canción *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Mi Canción"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="artist">Artista</Label>
-            <Input
-              id="artist"
-              value={artist}
-              onChange={(e) => setArtist(e.target.value)}
-              placeholder="Nombre del artista"
-              className="mt-1"
-            />
-          </div>
-        </div>
-
         <div>
-          <Label htmlFor="genre">Género *</Label>
+          <Label htmlFor="genre">Género para todas las canciones *</Label>
           <Select value={genre_id} onValueChange={setGenreId}>
             <SelectTrigger className="mt-1">
               <SelectValue placeholder="Selecciona un género" />
@@ -165,7 +143,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         </div>
 
         <div>
-          <Label htmlFor="file">Archivo de audio *</Label>
+          <Label htmlFor="file">Archivos de audio *</Label>
           <div className="mt-2 flex items-center gap-2">
             <Input
               id="file"
@@ -174,6 +152,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
               onChange={handleFileChange}
               accept="audio/*"
               className="cursor-pointer"
+              multiple // Allow multiple files
             />
             <Button
               type="button"
@@ -181,12 +160,13 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
               onClick={() => fileInputRef.current?.click()}
               className="flex-shrink-0"
             >
-              Seleccionar
+              Seleccionar Archivos
             </Button>
           </div>
-          {file && (
+          {files.length > 0 && (
             <p className="text-sm text-muted-foreground mt-2">
-              Archivo: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+              {files.length} {files.length === 1 ? "archivo seleccionado" : "archivos seleccionados"} (
+              {(files.reduce((acc, file) => acc + file.size, 0) / 1024 / 1024).toFixed(2)} MB)
             </p>
           )}
         </div>
@@ -201,16 +181,16 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         {success && (
           <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
             <Music className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p>Canción subida exitosamente</p>
+            <p>¡{files.length} {files.length === 1 ? "canción subida" : "canciones subidas"} exitosamente!</p>
           </div>
         )}
 
         <Button
           type="submit"
-          disabled={isLoading || !file}
+          disabled={isLoading || files.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? "Subiendo..." : "Subir canción"}
+          {isLoading ? `Subiendo ${files.length} canciones...` : `Subir ${files.length} canciones`}
         </Button>
       </form>
     </div>

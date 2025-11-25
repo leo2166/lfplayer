@@ -102,19 +102,19 @@ export default function AppPage() {
     }
   }
 
-  const handleUploadSuccess = async (songData: any) => {
-    try {
-      const res = await fetch("/api/songs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(songData),
-      })
+  const handleUploadSuccess = (newSongs: Song[]) => {
+    // We need to find the genre object for the new songs
+    const genre = genres.find((g) => g.id === newSongs[0]?.genre_id)
+    const newSongsWithGenre = newSongs.map((song) => ({
+      ...song,
+      genres: genre || undefined,
+    }))
 
-      if (res.ok) {
-        await fetchSongs(selectedGenre)
-      }
-    } catch (error) {
-      console.error("Error saving song:", error)
+    setSongs((prevSongs) => [...newSongsWithGenre, ...prevSongs])
+
+    // If the user is filtering by a different genre, switch to 'all' to show the new songs
+    if (selectedGenre !== "all" && selectedGenre !== newSongs[0]?.genre_id) {
+      setSelectedGenre("all")
     }
   }
 

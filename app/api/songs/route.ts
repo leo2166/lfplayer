@@ -55,26 +55,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { title, artist, genre_id, blob_url, duration } = await request.json()
+    const body = await request.json()
 
-    const { data, error } = await supabase
-      .from("songs")
-      .insert({
+    let songsToInsert: any[]
+
+    if (Array.isArray(body)) {
+      // Batch insert
+      songsToInsert = body.map((song) => ({
+        ...song,
         user_id: user.id,
-        title,
-        artist,
-        genre_id,
-        blob_url,
-        duration,
-      })
-      .select()
+      }))
+    } else {
+      // Single insert
+      const { title, artist, genre_id, blob_url, duration } = body
+      songsToInsert = [
+        {
+          user_id: user.id,
+          title,
+          artist,
+          genre_id,
+          blob_url,
+          duration,
+        },
+      ]
+    }
+
+    const { data, error } = await supabase.from("songs").insert(songsToInsert).select()
 
     if (error) throw error
 
-    return NextResponse.json({ song: data[0] })
+    return NextResponse.json({ songs: data })
   } catch (error) {
-    console.error("Error creating song:", error)
-    return NextResponse.json({ error: "Failed to create song" }, { status: 500 })
+    console.error("Error creating song(s):", error)
+    return NextResponse.json({ error: "Failed to create song(s)" }, { status: 500 })
   }
 }
 

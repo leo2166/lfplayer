@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS public.genres (
   name TEXT NOT NULL UNIQUE,
   description TEXT,
   color TEXT DEFAULT '#7C3AED',
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL DEFAULT auth.uid()
 );
 
 ALTER TABLE public.genres ENABLE ROW LEVEL SECURITY;
