@@ -9,5 +9,7 @@ INSERT INTO public.genres (name, description, color, created_by) VALUES
   ('R&B', 'Soul and R&B', '#D946EF', auth.uid()),
   ('Country', 'Country music', '#84CC16', auth.uid()),
   ('Reggae', 'Reggae and ska', '#10B981', auth.uid()),
-  ('Metal', 'Heavy metal', '#6366F1', auth.uid())
+  ('Metal', 'Heavy metal', '#6366F1', auth.uid()),
+  ('Baladas en español', 'Música romántica en español', '#3B82F6', auth.uid()),
+  ('Baladas en ingles', 'Música romántica en ingles', '#14B8A6', auth.uid())
 ON CONFLICT (name) DO NOTHING;
