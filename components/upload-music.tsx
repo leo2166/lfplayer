@@ -29,6 +29,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files
@@ -87,9 +88,13 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
           audio.onerror = () => resolve(0) // Resolve with 0 if duration can't be read
         })
 
+        const artistName = files[index].webkitRelativePath
+          ? files[index].webkitRelativePath.split("/")[0]
+          : ""
+
         return {
           title: files[index].name.replace(/\.[^/.]+$/, ""), // Title from filename
-          artist: "", // Artist can be added later
+          artist: artistName, // Artist can be added later
           genre_id,
           blob_url: blob.url,
           duration,
@@ -158,24 +163,42 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         </div>
 
         <div>
-          <Label htmlFor="file">Archivos de audio *</Label>
-          <div className="mt-2 flex items-center gap-2">
+          <Label htmlFor="file">Archivos o Carpetas de Audio *</Label>
+          <div className="hidden">
             <Input
-              id="file"
+              id="file-upload"
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".mp3"
-              className="cursor-pointer"
-              multiple // Allow multiple files
+              multiple
             />
+            <Input
+              id="folder-upload"
+              type="file"
+              ref={folderInputRef}
+              onChange={handleFileChange}
+              accept=".mp3"
+              multiple
+              webkitdirectory=""
+            />
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => document.getElementById('file-upload')?.click()}
               className="flex-shrink-0"
             >
               Seleccionar Archivos
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => document.getElementById('folder-upload')?.click()}
+              className="flex-shrink-0"
+            >
+              Seleccionar Carpeta
             </Button>
           </div>
           {files.length > 0 && (

@@ -8,6 +8,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import PlaylistCard from "@/components/playlist-card"
 import CreatePlaylistDialog from "@/components/create-playlist-dialog"
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 
 interface Playlist {
   id: string
@@ -22,6 +23,7 @@ export default function PlaylistsPage() {
   const [user, setUser] = useState<any>(null)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { playSong } = useMusicPlayer()
 
   useEffect(() => {
     const getUser = async () => {
@@ -90,6 +92,25 @@ export default function PlaylistsPage() {
     router.push(`/app/playlists/${id}`)
   }
 
+  const handlePlayPlaylist = async (playlistId: string) => {
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}/songs`)
+      const data = await res.json()
+      const songsToPlay = data.songs.map((ps: any) => ({
+        id: ps.songs.id,
+        title: ps.songs.title,
+        artist: ps.songs.artist,
+        duration: ps.songs.duration,
+        blob_url: ps.songs.blob_url,
+      }))
+      if (songsToPlay.length > 0) {
+        playSong(songsToPlay[0], songsToPlay)
+      }
+    } catch (error) {
+      console.error("Error playing playlist:", error)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-secondary flex items-center justify-center">
@@ -139,6 +160,7 @@ export default function PlaylistsPage() {
                 coverColor={playlist.cover_color}
                 onDelete={() => handleDeletePlaylist(playlist.id)}
                 onSelect={() => handlePlaylistSelect(playlist.id)}
+                onPlay={() => handlePlayPlaylist(playlist.id)}
               />
             ))}
           </div>

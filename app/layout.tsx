@@ -2,10 +2,13 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import GlobalMusicPlayer from "@/components/global-music-player"
+import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
+
 
 export const metadata: Metadata = {
   title: "Preferencia Musical",
@@ -38,7 +41,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`font-sans antialiased`}>
-        {children}
+        <MusicPlayerProvider>
+          {children}
+          <GlobalMusicPlayer />
+        </MusicPlayerProvider>
         <Analytics />
       </body>
     </html>
