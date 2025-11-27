@@ -1,19 +1,19 @@
-"use client"
+import { createClient } from "@/lib/supabase/server"
+import MusicLibrary from "./_components/music-library"
+import type { Song, Genre } from "@/lib/types"
 
-import { PlayCircle } from "lucide-react"
+// This page will now fetch data on the server and pass it to a client component.
+export default async function AppPage() {
+  const supabase = await createClient()
 
-export default function AppPage() {
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/50 p-8">
-      <div className="text-center">
-        <PlayCircle className="w-48 h-48 text-purple-600/20 mx-auto" strokeWidth={0.5} />
-        <h1 className="mt-8 text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">
-          Bienvenido a tu Música
-        </h1>
-        <p className="mt-4 text-lg text-muted-foreground max-w-md mx-auto">
-          Usa el menú para agregar nuevas canciones o explorar tus playlists.
-        </p>
-      </div>
-    </div>
-  )
+  // Fetch songs and genres in parallel
+  const [{ data: songsData }, { data: genresData }] = await Promise.all([
+    supabase.from("songs").select("*"),
+    supabase.from("genres").select("*"),
+  ])
+
+  const songs: Song[] = songsData ?? []
+  const genres: Genre[] = genresData ?? []
+
+  return <MusicLibrary songs={songs} genres={genres} />
 }

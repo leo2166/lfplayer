@@ -153,7 +153,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
               <SelectValue placeholder="Selecciona un género" />
             </SelectTrigger>
             <SelectContent>
-              {genres.map((genre) => (
+              {genres.sort((a, b) => a.name.localeCompare(b.name)).map((genre) => (
                 <SelectItem key={genre.id} value={genre.id}>
                   {genre.name}
                 </SelectItem>
