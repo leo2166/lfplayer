@@ -3,9 +3,29 @@ import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { type NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "crypto"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 })
+    }
+
     const { filename, contentType } = await request.json()
 
     if (!filename || !contentType) {

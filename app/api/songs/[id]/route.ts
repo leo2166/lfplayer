@@ -2,16 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { r2 } from '@/lib/cloudflare/r2';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { createClient } from '@/lib/supabase/server';
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { password } = await req.json();
-    const songId = params.id;
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // 1. Password validation
-    if (password !== 'lf2166') {
-      return NextResponse.json({ error: 'Clave incorrecta.' }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
+    }
+    
+    const songId = params.id;
 
     if (!songId) {
       return NextResponse.json({ error: 'ID de la canción es requerido.' }, { status: 400 });

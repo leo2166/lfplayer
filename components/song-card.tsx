@@ -9,7 +9,7 @@ interface SongCardProps {
   duration: number
   genre?: string
   onPlay: () => void
-  onDelete: () => void
+  onDelete?: () => void
   isPlaying?: boolean
 }
 
@@ -54,18 +54,19 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
           >
             <Play className="w-4 h-4 fill-current" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={(e) => {
-              console.log('SongCard delete button clicked'); // Diagnostic log
-              e.stopPropagation(); // Prevent any parent clicks
-              onDelete();
-            }}
-            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          {onDelete && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

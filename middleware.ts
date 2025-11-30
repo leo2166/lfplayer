@@ -29,13 +29,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Redirect to login if accessing protected routes
-  if (request.nextUrl.pathname.startsWith("/app") && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/auth/login"
-    return NextResponse.redirect(url)
-  }
-
   // Redirect to app if accessing auth pages while logged in
   if ((request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname === "/") && user) {
     const url = request.nextUrl.clone()

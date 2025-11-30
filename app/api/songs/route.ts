@@ -56,6 +56,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 })
+    }
+
     const body = await request.json()
 
     let songsToInsert: any[]
@@ -101,6 +111,16 @@ export async function DELETE(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 })
     }
 
     const { id, blob_url } = await request.json()

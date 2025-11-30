@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { Song, Genre } from "@/lib/types"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
+import { useUserRole } from "@/contexts/UserRoleContext"
 import { toast } from "sonner"
 import {
   Accordion,
@@ -34,14 +35,13 @@ interface MusicLibraryProps {
 }
 
 export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
+  const userRole = useUserRole()
   const [selectedGenre, setSelectedGenre] = useState("all")
   // State for artist deletion
   const [artistToDelete, setArtistToDelete] = useState<string | null>(null)
-  const [password, setPassword] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
   // State for single song deletion
   const [songToDelete, setSongToDelete] = useState<Song | null>(null)
-  const [songDeletePassword, setSongDeletePassword] = useState("")
   const [isSongDeleting, setIsSongDeleting] = useState(false)
   // State to prevent hydration errors
   const [hasMounted, setHasMounted] = useState(false)
@@ -96,16 +96,10 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       const response = await fetch('/api/delete', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ artist: artistToDelete, password }),
+        body: JSON.stringify({ artist: artistToDelete }),
       });
       const result = await response.json();
       if (!response.ok) {
-        if (response.status === 401) {
-          toast.dismiss(toastId);
-          toast.error(result.error || 'Clave incorrecta.');
-          setIsDeleting(false);
-          return;
-        }
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Artista '${artistToDelete}' eliminado correctamente.`, { id: toastId });
@@ -138,16 +132,10 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       const response = await fetch(`/api/songs/${songToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: songDeletePassword }),
+        // The body is now empty as authorization is handled by the session
       });
       const result = await response.json();
       if (!response.ok) {
-        if (response.status === 401) {
-          toast.dismiss(toastId);
-          toast.error(result.error || 'Clave incorrecta.');
-          setIsSongDeleting(false);
-          return;
-        }
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Canción '${songToDelete.title}' eliminada correctamente.`, { id: toastId });
@@ -194,12 +182,14 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                   </div>
                   <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
                 </AccordionPrimitive.Trigger>
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
-                  e.stopPropagation(); 
-                  handleDeleteRequest(artist); 
-                }}>
-                  <Trash2 className="w-5 h-5 text-destructive" />
-                </Button>
+                {userRole === 'admin' && (
+                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
+                    e.stopPropagation(); 
+                    handleDeleteRequest(artist); 
+                  }}>
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                  </Button>
+                )}
               </AccordionPrimitive.Header>
               <AccordionContent className="px-4 pt-2 pb-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -211,7 +201,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                       duration={song.duration || 0}
                       genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
                       onPlay={() => handlePlay(song)}
-                      onDelete={() => handleDeleteSongRequest(song)}
+                      onDelete={userRole === 'admin' ? () => handleDeleteSongRequest(song) : undefined}
                       isPlaying={isPlaying && currentSong?.id === song.id}
                     />
                   ))}
@@ -236,21 +226,11 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>¿Estás seguro de que quieres eliminar a '{artistToDelete}'?</AlertDialogTitle>
-                <AlertDialogDescription>Esta acción es irreversible. Se eliminarán todas las canciones de este artista. Por favor, introduce la clave de seguridad para confirmar.</AlertDialogDescription>
+                <AlertDialogDescription>Esta acción es irreversible. Se eliminarán todas las canciones de este artista.</AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="py-4">
-                <Input 
-                  id="artist-delete-password" // Added unique ID
-                  type="password"
-                  placeholder="Clave de seguridad"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmDelete()}
-                />
-              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={handleCancelDelete} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting || !password}>
+                <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting}>
                   {isDeleting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Eliminando...</>) : "Confirmar Eliminación"}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -263,22 +243,12 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>¿Eliminar la canción '{songToDelete?.title}'?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta acción es irreversible. La canción se eliminará permanentemente. Por favor, introduce la clave de seguridad para confirmar.
+                  Esta acción es irreversible. La canción se eliminará permanentemente.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="py-4">
-                <Input
-                  id="song-delete-password"
-                  type="password"
-                  placeholder="Clave de seguridad"
-                  value={songDeletePassword}
-                  onChange={(e) => setSongDeletePassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmSongDelete()}
-                />
-              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={handleCancelSongDelete} disabled={isSongDeleting}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmSongDelete} disabled={isSongDeleting || !songDeletePassword}>
+                <AlertDialogAction onClick={handleConfirmSongDelete} disabled={isSongDeleting}>
                   {isSongDeleting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Eliminando...</>) : "Confirmar Eliminación"}
                 </AlertDialogAction>
               </AlertDialogFooter>

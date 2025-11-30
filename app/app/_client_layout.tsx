@@ -1,20 +1,27 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+
 import Link from "next/link"
+
 import { usePathname, useRouter } from "next/navigation"
+
 import { Music, Menu, X, ListMusic, PlusCircle } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
+
 import { cn } from "@/lib/utils"
+
 import AddMusicDialog from "@/components/add-music-dialog"
+
+import { useUserRole } from "@/contexts/UserRoleContext"
 
 export default function ClientLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const userRole = useUserRole()
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -102,19 +109,21 @@ export default function ClientLayout({
               })}
 
               {/* Add Music Button */}
-              <button
-                onClick={() => {
-                  setAddMusicOpen(true)
-                  setSidebarOpen(false)
-                }}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
-                  "text-muted-foreground hover:text-foreground hover:bg-accent",
-                )}
-              >
-                <PlusCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="font-medium">Agregar Música</span>
-              </button>
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => {
+                    setAddMusicOpen(true)
+                    setSidebarOpen(false)
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+                    "text-muted-foreground hover:text-foreground hover:bg-accent",
+                  )}
+                >
+                  <PlusCircle className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-medium">Agregar Música</span>
+                </button>
+              )}
             </nav>
 
             {/* Footer Info */}
