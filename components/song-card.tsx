@@ -44,7 +44,7 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
             <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 transition-opacity">
           <Button
             size="icon"
             variant="ghost"
