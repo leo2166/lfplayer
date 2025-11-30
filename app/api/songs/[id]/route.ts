@@ -64,8 +64,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     
     return NextResponse.json({ message: 'Canción eliminada correctamente.' });
 
-  } catch (error) {
-    console.error('Error en la ruta de eliminación de canción:', error);
+    } catch (error) {    console.error('Error en la ruta de eliminación de canción:', error);
     const errorMessage = error instanceof Error ? error.message : 'Un error inesperado ocurrió.';
     return NextResponse.json({ error: `Error interno del servidor: ${errorMessage}` }, { status: 500 });
   }
