@@ -56,7 +56,11 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
           <Button
             size="icon"
             variant="ghost"
-            onClick={onDelete}
+            onClick={(e) => {
+              console.log('SongCard delete button clicked'); // Diagnostic log
+              e.stopPropagation(); // Prevent any parent clicks
+              onDelete();
+            }}
             className="h-8 w-8 text-destructive hover:bg-destructive/10"
           >
             <Trash2 className="w-4 h-4" />

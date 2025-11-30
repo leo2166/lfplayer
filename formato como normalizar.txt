@@ -1,0 +1,2 @@
+.\normalize_audio.bat "G:\mi musica\Juan Gabriel - Los Duo (Deluxe Version) (2015) By CM" "G:\mi musica\Juan Gabrie
+     Duos"

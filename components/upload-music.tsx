@@ -21,36 +21,39 @@ interface UploadMusicProps {
   onUploadSuccess?: (songs: any[]) => void
 }
 
+interface UploadError {
+  fileName: string
+  reason: string
+}
+
 export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProps) {
   const [genre_id, setGenreId] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [uploadErrors, setUploadErrors] = useState<UploadError[]>([])
+  const [successCount, setSuccessCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFiles([])
+    setError(null)
+    setUploadErrors([])
+    setSuccessCount(0)
     const selectedFiles = e.target.files
     if (selectedFiles) {
-      const audioFiles = Array.from(selectedFiles).filter((file) => {
-        if (!file.name.toLowerCase().endsWith(".mp3")) {
-          setError(`El archivo "${file.name}" no es un archivo .mp3 y será ignorado.`)
-          return false
-        }
-        return true
-      })
+      const audioFiles = Array.from(selectedFiles).filter((file) => file.name.toLowerCase().endsWith(".mp3"))
       setFiles(audioFiles)
-      if (audioFiles.length > 0) {
-        setError(null)
-      }
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setUploadErrors([])
+    setSuccessCount(0)
 
     if (files.length === 0 || !genre_id) {
       setError("Por favor selecciona archivos de audio y un género")
@@ -61,40 +64,59 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
     setUploadProgress(0)
 
     try {
-      setUploadProgress(5) // Initial progress
+      setUploadProgress(5)
 
-      // Step 1: Upload all files to Blob storage in parallel
-      const uploadPromises = files.map((file) => {
+      const uploadPromises = files.map((file, index) => {
         const formData = new FormData()
         formData.append("file", file)
-        return fetch("/api/upload", { method: "POST", body: formData }).then(
-          (res) => {
-            if (!res.ok) throw new Error(`Error al subir ${file.name}`)
-            // Progressively increase progress after each file upload
+        return fetch("/api/upload", { method: "POST", body: formData })
+          .then(async (res) => {
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({}))
+              throw new Error(errorData.error || `Error de servidor al subir ${file.name}`)
+            }
             setUploadProgress((prev) => prev + 65 / files.length)
-            return res.json()
-          },
-        )
-      })
+            const blob = await res.json()
+            return { blob, originalFile: file }
+          })
+      });
 
-      const uploadedBlobs = await Promise.all(uploadPromises)
-      setUploadProgress(70) // Mark upload as complete
+      const uploadResults = await Promise.allSettled(uploadPromises);
+      setUploadProgress(70)
 
-      // Step 2: Get duration for each uploaded file and prepare song data
-      const songsDataPromises = uploadedBlobs.map(async (blob, index) => {
+      const successfulUploads: { blob: any, originalFile: File }[] = [];
+      const failedUploads: UploadError[] = [];
+
+      uploadResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successfulUploads.push(result.value);
+        } else {
+          failedUploads.push({
+            fileName: files[index].name,
+            reason: result.reason.message,
+          });
+        }
+      });
+
+      if (successfulUploads.length === 0) {
+        setUploadErrors(failedUploads)
+        throw new Error("Ninguna canción pudo ser subida.")
+      }
+      
+      const songsDataPromises = successfulUploads.map(async ({ blob, originalFile }) => {
         const audio = new Audio(blob.url)
         const duration = await new Promise<number>((resolve) => {
           audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
-          audio.onerror = () => resolve(0) // Resolve with 0 if duration can't be read
+          audio.onerror = () => resolve(0)
         })
 
-        const artistName = files[index].webkitRelativePath
-          ? files[index].webkitRelativePath.split("/")[0]
+        const artistName = originalFile.webkitRelativePath
+          ? originalFile.webkitRelativePath.split("/")[0]
           : ""
 
         return {
-          title: files[index].name.replace(/\.[^/.]+$/, ""), // Title from filename
-          artist: artistName, // Artist can be added later
+          title: originalFile.name.replace(/\.[^/.]+$/, ""),
+          artist: artistName,
           genre_id,
           blob_url: blob.url,
           duration,
@@ -102,13 +124,12 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
       })
 
       const songsData = await Promise.all(songsDataPromises)
-      setUploadProgress(85) // Mark metadata processing as complete
-
-      // Step 3: Send song data to be saved in the database
+      setUploadProgress(85)
+      
       const saveRes = await fetch("/api/songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(songsData), // Sending an array of songs
+        body: JSON.stringify(songsData),
       })
 
       if (!saveRes.ok) {
@@ -116,25 +137,26 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
       }
 
       const savedSongs = await saveRes.json()
-      setUploadProgress(100) // Done
-
+      setUploadProgress(100)
+      
       onUploadSuccess?.(savedSongs.songs)
+      setSuccessCount(savedSongs.songs.length);
+      setUploadErrors(failedUploads);
 
       // Reset form
-      setGenreId("")
       setFiles([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (folderInputRef.current) folderInputRef.current.value = ""
+      
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Ocurrió un error durante la subida",
-      )
+      setError(err instanceof Error ? err.message : "Ocurrió un error durante la subida")
     } finally {
       setIsLoading(false)
-      setTimeout(() => setUploadProgress(0), 1000) // Hide progress bar after a second
+      setTimeout(() => {
+        setUploadProgress(0)
+        setSuccessCount(0)
+        setUploadErrors([])
+      }, 5000)
     }
   }
 
@@ -165,39 +187,14 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         <div>
           <Label htmlFor="file">Archivos o Carpetas de Audio *</Label>
           <div className="hidden">
-            <Input
-              id="file-upload"
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".mp3"
-              multiple
-            />
-            <Input
-              id="folder-upload"
-              type="file"
-              ref={folderInputRef}
-              onChange={handleFileChange}
-              accept=".mp3"
-              multiple
-              webkitdirectory=""
-            />
+            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3" multiple />
+            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3" multiple webkitdirectory="" />
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => document.getElementById('file-upload')?.click()}
-              className="flex-shrink-0"
-            >
+            <Button type="button" variant="outline" onClick={() => document.getElementById('file-upload')?.click()} className="flex-shrink-0">
               Seleccionar Archivos
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => document.getElementById('folder-upload')?.click()}
-              className="flex-shrink-0"
-            >
+            <Button type="button" variant="outline" onClick={() => document.getElementById('folder-upload')?.click()} className="flex-shrink-0">
               Seleccionar Carpeta
             </Button>
           </div>
@@ -211,14 +208,9 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
 
         {isLoading && (
           <div className="space-y-2">
-            <Label>
-              Subiendo {files.length}{" "}
-              {files.length === 1 ? "canción" : "canciones"}...
-            </Label>
+            <Label>Subiendo {files.length} {files.length === 1 ? "canción" : "canciones"}...</Label>
             <Progress value={uploadProgress} className="w-full" />
-            <p className="text-xs text-muted-foreground text-center">
-              {Math.round(uploadProgress)}%
-            </p>
+            <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
           </div>
         )}
 
@@ -229,10 +221,19 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
           </div>
         )}
 
-        {success && (
+        {successCount > 0 && (
           <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
             <Music className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p>¡{files.length} {files.length === 1 ? "canción subida" : "canciones subidas"} exitosamente!</p>
+            <p>¡{successCount} {successCount === 1 ? "canción subida" : "canciones subidas"} exitosamente!</p>
+          </div>
+        )}
+        
+        {uploadErrors.length > 0 && (
+          <div className="space-y-2 pt-2">
+             <Label className="text-red-600">Archivos con errores:</Label>
+             <ul className="text-xs text-red-600/90 list-disc list-inside bg-red-50 dark:bg-red-950/50 p-2 rounded-md">
+              {uploadErrors.map(err => <li key={err.fileName}><strong>{err.fileName}:</strong> {err.reason}</li>)}
+             </ul>
           </div>
         )}
 
@@ -241,7 +242,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
           disabled={isLoading || files.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Subiendo ${files.length} canciones...` : `Subir ${files.length} canciones`}
+          {isLoading ? `Subiendo...` : `Subir ${files.length} canciones`}
         </Button>
       </form>
     </div>

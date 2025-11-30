@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
-import { del } from "@vercel/blob"
+import { r2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/cloudflare/r2"
+import { DeleteObjectCommand } from "@aws-sdk/client-s3"
 
 export async function GET(request: NextRequest) {
   try {
@@ -104,12 +105,20 @@ export async function DELETE(request: NextRequest) {
 
     const { id, blob_url } = await request.json()
 
-    // Delete from blob
+    // Delete from R2
     if (blob_url) {
       try {
-        await del(blob_url)
-      } catch (blobError) {
-        console.error("Error deleting blob:", blobError)
+        const url = new URL(blob_url)
+        const objectKey = url.pathname.substring(1) // Remove leading slash
+
+        await r2.send(
+          new DeleteObjectCommand({
+            Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+            Key: objectKey,
+          })
+        )
+      } catch (r2Error) {
+        console.error("Error deleting from R2:", r2Error)
         // Continue with database deletion
       }
     }
