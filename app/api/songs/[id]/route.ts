@@ -50,7 +50,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
               }
       // Note: We are not handling deletion of Supabase storage files here as per user request to deprecate it.
     }
-    }
 
     // 4. Delete the song record from Supabase
     const { error: deleteError } = await supabaseAdmin
