@@ -1,0 +1,6 @@
+Las funcionalidades de eliminación (playlists, canciones, canciones por artista) y la visibilidad de los iconos de borrado han sido implementadas y depuradas, incluyendo:
+- Manejo de errores en el lado del cliente para la eliminación de playlists.
+- Lógica de backend para la eliminación de playlists, incluyendo la limpieza de archivos en Cloudflare R2 y registros de canciones en Supabase.
+- Extracción robusta de claves de R2 para la eliminación de canciones individuales y por artista.
+- Iconos de borrado siempre visibles en la UI y tarjetas de canciones clicables para reproducción.
+- Errores de compilación recurrentes en Vercel (sintaxis y variables de entorno faltantes para Supabase y Cloudflare R2) han sido resueltos.

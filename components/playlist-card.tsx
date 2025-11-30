@@ -55,7 +55,7 @@ export default function PlaylistCard({
             e.stopPropagation()
             onDelete()
           }}
-          className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-700"
+          className="h-8 w-8 rounded-full bg-blue-500 !opacity-100 !block"
         >
           <Trash2 className="w-4 h-4" />
         </Button>
