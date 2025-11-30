@@ -64,27 +64,53 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
     setUploadProgress(0)
 
     try {
-      setUploadProgress(5)
+      const uploadPromises = files.map(async (file, index) => {
+        try {
+          // Step 1: Get a pre-signed URL from our API
+          const presignResponse = await fetch("/api/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              contentType: file.type,
+            }),
+          });
 
-      const uploadPromises = files.map((file, index) => {
-        const formData = new FormData()
-        formData.append("file", file)
-        return fetch("/api/upload", { method: "POST", body: formData })
-          .then(async (res) => {
-            if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}))
-              throw new Error(errorData.error || `Error de servidor al subir ${file.name}`)
-            }
-            setUploadProgress((prev) => prev + 65 / files.length)
-            const blob = await res.json()
-            return { blob, originalFile: file }
-          })
+          if (!presignResponse.ok) {
+            throw new Error(`No se pudo obtener la URL de subida para ${file.name}`);
+          }
+          const { url, downloadUrl } = await presignResponse.json();
+          
+          setUploadProgress((prev) => prev + (10 / files.length));
+
+          // Step 2: Upload the file directly to R2 using the pre-signed URL
+          const uploadResponse = await fetch(url, {
+            method: "PUT",
+            body: file,
+            headers: {
+              "Content-Type": file.type,
+            },
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Error al subir ${file.name} a R2`);
+          }
+
+          setUploadProgress((prev) => prev + (60 / files.length));
+          
+          return { downloadUrl, originalFile: file };
+        } catch (error) {
+          // We re-throw the error to be caught by Promise.allSettled
+          throw new Error(error instanceof Error ? error.message : String(error));
+        }
       });
 
       const uploadResults = await Promise.allSettled(uploadPromises);
       setUploadProgress(70)
 
-      const successfulUploads: { blob: any, originalFile: File }[] = [];
+      const successfulUploads: { downloadUrl: string, originalFile: File }[] = [];
       const failedUploads: UploadError[] = [];
 
       uploadResults.forEach((result, index) => {
@@ -97,28 +123,31 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
           });
         }
       });
-
+      
       if (successfulUploads.length === 0) {
         setUploadErrors(failedUploads)
         throw new Error("Ninguna canción pudo ser subida.")
       }
-      
-      const songsDataPromises = successfulUploads.map(async ({ blob, originalFile }) => {
-        const audio = new Audio(blob.url)
+
+      const songsDataPromises = successfulUploads.map(async ({ downloadUrl, originalFile }) => {
+        const audio = new Audio(downloadUrl)
         const duration = await new Promise<number>((resolve) => {
           audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
-          audio.onerror = () => resolve(0)
+          audio.onerror = () => {
+            console.warn(`Could not load metadata for ${downloadUrl}. Duration will be 0.`)
+            resolve(0)
+          }
         })
 
         const artistName = originalFile.webkitRelativePath
           ? originalFile.webkitRelativePath.split("/")[0]
-          : ""
+          : "Varios Artistas"
 
         return {
-          title: originalFile.name.replace(/\.[^/.]+$/, ""),
+          title: originalFile.name.replace(/\.mp3$/i, ""),
           artist: artistName,
           genre_id,
-          blob_url: blob.url,
+          blob_url: downloadUrl,
           duration,
         }
       })
@@ -133,7 +162,8 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
       })
 
       if (!saveRes.ok) {
-        throw new Error("Error al guardar las canciones en la base de datos")
+        const errorData = await saveRes.json().catch(() => ({}))
+        throw new Error(errorData.error || "Error al guardar las canciones en la base de datos")
       }
 
       const savedSongs = await saveRes.json()
@@ -156,6 +186,7 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         setUploadProgress(0)
         setSuccessCount(0)
         setUploadErrors([])
+        setError(null)
       }, 5000)
     }
   }
