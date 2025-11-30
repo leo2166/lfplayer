@@ -45,13 +45,17 @@ export async function DELETE(req: NextRequest) {
 
       // Case 1: File is in Cloudflare R2
       if (r2PublicUrl && song.blob_url.startsWith(r2PublicUrl)) {
-        const key = song.blob_url.split('/').pop();
-        if (key) {
+        let key = song.blob_url.substring(r2PublicUrl.length);
+        const finalKey = key.startsWith('/') ? key.substring(1) : key;
+
+        if (finalKey) {
           const deleteParams = {
             Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-            Key: key,
+            Key: finalKey,
           };
           deletePromises.push(r2.send(new DeleteObjectCommand(deleteParams)));
+        } else {
+          console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
         }
       }
       // Case 2: File is in Supabase Storage

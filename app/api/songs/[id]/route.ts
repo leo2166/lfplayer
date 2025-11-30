@@ -31,17 +31,23 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     // 3. Delete file from Cloudflare R2 (if it exists and is an R2 URL)
     if (song.blob_url) {
-      const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
-      if (r2PublicUrl && song.blob_url.startsWith(r2PublicUrl)) {
-        const key = song.blob_url.split('/').pop();
-        if (key) {
-          const deleteParams = {
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-            Key: key,
-          };
-          await r2.send(new DeleteObjectCommand(deleteParams));
-        }
-      }
+              const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
+              if (r2PublicUrl && song.blob_url.startsWith(r2PublicUrl)) {
+                // Extract the key by removing the public URL prefix
+                let key = song.blob_url.substring(r2PublicUrl.length);
+                // Ensure no leading slash if r2PublicUrl ends without one and key starts with one
+                const finalKey = key.startsWith('/') ? key.substring(1) : key;
+      
+                if (finalKey) { // Check if key is not empty
+                  const deleteParams = {
+                    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+                    Key: finalKey,
+                  };
+                  await r2.send(new DeleteObjectCommand(deleteParams));
+                } else {
+                  console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
+                }
+              }      }
       // Note: We are not handling deletion of Supabase storage files here as per user request to deprecate it.
     }
 
