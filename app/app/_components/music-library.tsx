@@ -37,12 +37,9 @@ interface MusicLibraryProps {
 export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const userRole = useUserRole()
   const [selectedGenre, setSelectedGenre] = useState("all")
-  // State for artist deletion
-  const [artistToDelete, setArtistToDelete] = useState<string | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
   // State for single song deletion
-  const [songToDelete, setSongToDelete] = useState<Song | null>(null)
-  const [isSongDeleting, setIsSongDeleting] = useState(false)
+  const [deletingSong, setDeletingSong] = useState<Song | null>(null)
   // State to prevent hydration errors
   const [hasMounted, setHasMounted] = useState(false)
 
@@ -78,73 +75,52 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   }
 
   // --- Artist Deletion Logic ---
-  const handleDeleteRequest = (artist: string) => {
-    setArtistToDelete(artist)
-  }
-
-  const handleCancelDelete = () => {
-    setArtistToDelete(null)
-    setPassword("")
-    setIsDeleting(false)
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!artistToDelete) return
-    setIsDeleting(true)
-    const toastId = toast.loading(`Eliminando artista '${artistToDelete}'...`)
+  const handleDeleteArtist = async (artist: string) => {
+    if (deletingArtist === artist) return; // Prevent multiple deletions
+    setDeletingArtist(artist);
+    const toastId = toast.loading(`Eliminando artista '${artist}'...`);
     try {
       const response = await fetch('/api/delete', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ artist: artistToDelete }),
+        body: JSON.stringify({ artist }),
       });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || 'Ocurrió un error');
       }
-      toast.success(`Artista '${artistToDelete}' eliminado correctamente.`, { id: toastId });
-      handleCancelDelete()
-      setTimeout(() => router.refresh(), 100); // Delay refresh to allow dialog to close
+      toast.success(`Artista '${artist}' eliminado correctamente.`, { id: toastId });
+      router.refresh();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido"
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       const displayError = errorMessage.includes("base de datos") ? errorMessage : `Error al eliminar: ${errorMessage}`;
       toast.error(displayError, { id: toastId });
-      setIsDeleting(false)
+    } finally {
+      setDeletingArtist(null);
     }
-  }
-
-    // --- Single Song Deletion Logic ---
-  const handleDeleteSongRequest = (song: Song) => {
-    setSongToDelete(song);
   };
 
-  const handleCancelSongDelete = () => {
-    setSongToDelete(null);
-    setSongDeletePassword("");
-    setIsSongDeleting(false);
-  };
-
-  const handleConfirmSongDelete = async () => {
-    if (!songToDelete) return;
-    setIsSongDeleting(true);
-    const toastId = toast.loading(`Eliminando canción '${songToDelete.title}'...`);
+  // --- Single Song Deletion Logic ---
+  const handleDeleteSong = async (song: Song) => {
+    if (deletingSong?.id === song.id) return; // Prevent multiple deletions
+    setDeletingSong(song);
+    const toastId = toast.loading(`Eliminando canción '${song.title}'...`);
     try {
-      const response = await fetch(`/api/songs/${songToDelete.id}`, {
+      const response = await fetch(`/api/songs/${song.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        // The body is now empty as authorization is handled by the session
       });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || 'Ocurrió un error');
       }
-      toast.success(`Canción '${songToDelete.title}' eliminada correctamente.`, { id: toastId });
-      handleCancelSongDelete();
-      setTimeout(() => router.refresh(), 100); // Delay refresh to allow dialog to close
+      toast.success(`Canción '${song.title}' eliminada correctamente.`, { id: toastId });
+      router.refresh();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
-      setIsSongDeleting(false);
+    } finally {
+      setDeletingSong(null);
     }
   };
 
@@ -183,11 +159,17 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                   <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
                 </AccordionPrimitive.Trigger>
                 {userRole === 'admin' && (
-                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
-                    e.stopPropagation(); 
-                    handleDeleteRequest(artist); 
-                  }}>
-                    <Trash2 className="w-5 h-5 text-destructive" />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity" 
+                    onClick={(e) => {
+                      e.stopPropagation(); 
+                      handleDeleteArtist(artist); 
+                    }}
+                    disabled={deletingArtist === artist}
+                  >
+                    {deletingArtist === artist ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="w-5 h-5 text-destructive" />}
                   </Button>
                 )}
               </AccordionPrimitive.Header>
@@ -201,7 +183,8 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                       duration={song.duration || 0}
                       genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
                       onPlay={() => handlePlay(song)}
-                      onDelete={userRole === 'admin' ? () => handleDeleteSongRequest(song) : undefined}
+                      onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
+                      isDeleting={deletingSong?.id === song.id}
                       isPlaying={isPlaying && currentSong?.id === song.id}
                     />
                   ))}
@@ -221,39 +204,9 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       
       {hasMounted && (
         <>
-          {/* Artist Deletion Dialog */}
-          <AlertDialog open={!!artistToDelete} onOpenChange={(open) => !open && handleCancelDelete()}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro de que quieres eliminar a '{artistToDelete}'?</AlertDialogTitle>
-                <AlertDialogDescription>Esta acción es irreversible. Se eliminarán todas las canciones de este artista.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleCancelDelete} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting}>
-                  {isDeleting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Eliminando...</>) : "Confirmar Eliminación"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
 
-          {/* Single Song Deletion Dialog */}
-          <AlertDialog open={!!songToDelete} onOpenChange={(open) => !open && handleCancelSongDelete()}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Eliminar la canción '{songToDelete?.title}'?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción es irreversible. La canción se eliminará permanentemente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleCancelSongDelete} disabled={isSongDeleting}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmSongDelete} disabled={isSongDeleting}>
-                  {isSongDeleting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Eliminando...</>) : "Confirmar Eliminación"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+
+
         </>
       )}
     </>

@@ -11,6 +11,7 @@ interface SongCardProps {
   onPlay: () => void
   onDelete?: () => void
   isPlaying?: boolean
+  isDeleting?: boolean // Add this prop
 }
 
 export default function SongCard({ title, artist, duration, genre, onPlay, onDelete, isPlaying }: SongCardProps) {
@@ -63,8 +64,9 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
                 onDelete();
               }}
               className="h-8 w-8 text-destructive hover:bg-destructive/10"
+              disabled={isDeleting} // Disable button while deleting
             >
-              <Trash2 className="w-4 h-4" />
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             </Button>
           )}
         </div>
