@@ -68,25 +68,35 @@ export default function PlaylistsPage() {
     }
   }
 
-  const handleDeletePlaylist = async (id: string) => {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar esta playlist?")) {
-      return
-    }
-
-    try {
-      const res = await fetch("/api/playlists", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-
-      if (res.ok) {
-        setPlaylists(playlists.filter((p) => p.id !== id))
-      }
-    } catch (error) {
-      console.error("Error deleting playlist:", error)
-    }
-  }
+    const handleDeletePlaylist = async (playlistId: string) => {
+        try {
+            const res = await fetch(`/api/playlists/${playlistId}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                toast({
+                    title: 'Playlist eliminada',
+                    description: 'La playlist ha sido eliminada correctamente.',
+                    variant: 'success',
+                });
+                router.refresh();
+            } else {
+                const errorData = await res.json();
+                toast({
+                    title: 'Error al eliminar playlist',
+                    description: errorData.error || 'Ocurrió un error desconocido al eliminar la playlist.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            console.error('Error deleting playlist:', error);
+            toast({
+                title: 'Error al eliminar playlist',
+                description: 'No se pudo conectar con el servidor para eliminar la playlist.',
+                variant: 'destructive',
+            });
+        }
+    };
 
   const handlePlaylistSelect = (id: string) => {
     router.push(`/app/playlists/${id}`)
