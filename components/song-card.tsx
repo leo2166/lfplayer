@@ -22,11 +22,12 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
 
   return (
     <div
-      className={`group relative rounded-lg border p-4 transition-all hover:shadow-md ${
+      className={`group relative rounded-lg border p-4 transition-all hover:shadow-md cursor-pointer ${
         isPlaying
           ? "border-purple-600 bg-purple-50 dark:bg-purple-950/20"
           : "border-border bg-card hover:border-purple-400"
       }`}
+      onClick={onPlay}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
