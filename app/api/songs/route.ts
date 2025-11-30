@@ -130,15 +130,16 @@ export async function DELETE(request: NextRequest) {
       try {
         const url = new URL(blob_url)
         const objectKey = url.pathname.substring(1) // Remove leading slash
-
-        await r2.send(
-          new DeleteObjectCommand({
+        
+        const deleteCommand = new DeleteObjectCommand({
             Bucket: CLOUDFLARE_R2_BUCKET_NAME,
             Key: objectKey,
-          })
-        )
+        });
+
+        await r2.send(deleteCommand);
+        console.log(`Successfully deleted object from R2: ${objectKey}`);
       } catch (r2Error) {
-        console.error("Error deleting from R2:", r2Error)
+        console.error("Error deleting from R2:", r2Error);
         // Continue with database deletion
       }
     }

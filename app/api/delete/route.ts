@@ -91,7 +91,9 @@ export async function DELETE(req: NextRequest) {
 
     const results = await Promise.allSettled(deletePromises);
     results.forEach(result => {
-        if (result.status === 'rejected') {
+        if (result.status === 'fulfilled') {
+            console.log('Successfully deleted a file from storage:', result.value);
+        } else {
             console.error('Failed to delete a file from storage:', result.reason);
             // Non-fatal, we still want to delete the DB record.
         }
