@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
                 } else {
                   console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
                 }
-              }      }
+              }
       // Note: We are not handling deletion of Supabase storage files here as per user request to deprecate it.
     }
 
