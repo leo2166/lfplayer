@@ -90,7 +90,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Artista '${artist}' eliminado correctamente.`, { id: toastId });
-      router.refresh();
+      setTimeout(() => router.refresh(), 100); // Re-introduce delay for refresh
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       const displayError = errorMessage.includes("base de datos") ? errorMessage : `Error al eliminar: ${errorMessage}`;
@@ -115,7 +115,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Canción '${song.title}' eliminada correctamente.`, { id: toastId });
-      router.refresh();
+      setTimeout(() => router.refresh(), 100); // Re-introduce delay for refresh
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
