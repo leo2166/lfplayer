@@ -14,7 +14,7 @@ interface SongCardProps {
   isDeleting?: boolean // Add this prop
 }
 
-export default function SongCard({ title, artist, duration, genre, onPlay, onDelete, isPlaying }: SongCardProps) {
+export default function SongCard({ title, artist, duration, genre, onPlay, onDelete, isPlaying, isDeleting }: SongCardProps) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
