@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { r2 } from '@/lib/cloudflare/r2';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache'; // Añadir esta línea
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -112,6 +113,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Error al eliminar los registros de la base de datos.' }, { status: 500 });
     }
     
+    revalidatePath('/app'); // Invalidate cache for the music library page
     return NextResponse.json({ message: `Artista '${artist}' y todas sus canciones eliminadas correctamente.` });
 
   } catch (error) {

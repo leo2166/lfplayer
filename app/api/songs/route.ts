@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { revalidatePath } from 'next/cache'; // Añadir esta línea
 import { type NextRequest, NextResponse } from "next/server"
 import { r2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/cloudflare/r2"
 import { DeleteObjectCommand } from "@aws-sdk/client-s3"
@@ -149,6 +150,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error
 
+    revalidatePath('/app'); // Invalidate cache for the music library page
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting song:", error)
