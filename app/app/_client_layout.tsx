@@ -1,20 +1,15 @@
 "use client"
 
 import { useState } from "react"
-
 import Link from "next/link"
-
 import { usePathname, useRouter } from "next/navigation"
-
-import { Music, Menu, X, ListMusic, PlusCircle } from "lucide-react"
+import { Music, Menu, X, ListMusic, PlusCircle, Download } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-
 import { cn } from "@/lib/utils"
-
 import AddMusicDialog from "@/components/add-music-dialog"
-
 import { useUserRole } from "@/contexts/UserRoleContext"
+import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
 
 export default function ClientLayout({
   children,
@@ -26,6 +21,7 @@ export default function ClientLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
+  const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook
 
   const navItems = [
     {
@@ -41,10 +37,7 @@ export default function ClientLayout({
   ]
 
   const handleUploadSuccess = () => {
-    // When new music is uploaded, close the dialog
     setAddMusicOpen(false)
-    // And refresh the page to show the new content
-    // Note: this might not be needed with the new simplified page
     router.refresh()
   }
 
@@ -151,6 +144,19 @@ export default function ClientLayout({
           {/* Page Content */}
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
+
+        {/* PWA Install Button */}
+        {canInstall && (
+          <div className="fixed bottom-4 right-4 z-50">
+            <Button
+              onClick={handleInstall}
+              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white shadow-lg"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Instalar App
+            </Button>
+          </div>
+        )}
       </div>
     </>
   )
