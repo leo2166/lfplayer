@@ -14,6 +14,8 @@ export const metadata: Metadata = {
   title: "Preferencia Musical",
   description: "Tu aplicación de música personal. Crea playlists, organiza por género y reproduce tu música favorita.",
   generator: "v0.app",
+  manifest: "/manifest.json", // Añadir manifest
+  themeColor: "#6366f1", // Añadir theme-color
   icons: {
     icon: [
       {

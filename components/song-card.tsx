@@ -1,6 +1,6 @@
 "use client"
 
-import { Music, Play, Trash2 } from "lucide-react"
+import { Music, Play, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface SongCardProps {

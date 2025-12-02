@@ -4,7 +4,7 @@ import { r2 } from '@/lib/cloudflare/r2';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -23,7 +23,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
     }
     
-    const songId = params.id;
+    const { id: songId } = await params;
 
     if (!songId) {
       return NextResponse.json({ error: 'ID de la canción es requerido.' }, { status: 400 });
