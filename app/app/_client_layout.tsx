@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Music, Menu, X, ListMusic, PlusCircle, Download } from "lucide-react"
+import { Music, Menu, X, ListMusic, PlusCircle, Download, LogOut } from "lucide-react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,7 @@ export default function ClientLayout({
   const userRole = useUserRole()
   const pathname = usePathname()
   const router = useRouter()
+  const supabase = createClientComponentClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
   const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook
@@ -39,6 +41,11 @@ export default function ClientLayout({
   const handleUploadSuccess = () => {
     setAddMusicOpen(false)
     router.refresh()
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
   return (
@@ -119,9 +126,21 @@ export default function ClientLayout({
               )}
             </nav>
 
-            {/* Footer Info */}
-            <div className="p-4 border-t border-border text-xs text-muted-foreground text-center">
-              <p>Preferencia Musical v1.0</p>
+            {/* Footer Info & Logout */}
+            <div className="p-4 border-t border-border">
+              {userRole !== 'guest' && (
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left text-muted-foreground hover:text-foreground hover:bg-accent mb-2"
+                >
+                  <LogOut className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-medium">Cerrar Sesión</span>
+                </button>
+              )}
+              <div className="text-xs text-muted-foreground text-center">
+                <p>Preferencia Musical v1.0</p>
+                <p>Propiedad de Ing. Lucidio Fuenmayor.</p>
+              </div>
             </div>
           </div>
         </aside>
