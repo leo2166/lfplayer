@@ -63,7 +63,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { song_id } = await request.json()
+    const body = await request.json()
+    const { song_id, song_ids } = body
 
     // Verify user owns this playlist
     const { data: playlist } = await supabase
@@ -77,31 +78,53 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 })
     }
 
-    // Get max position
-    const { data: maxPosition } = await supabase
+    // Get max position to calculate new positions
+    const { data: maxPositionData } = await supabase
       .from("playlist_songs")
       .select("position")
       .eq("playlist_id", params.id)
       .order("position", { ascending: false })
       .limit(1)
 
-    const position = (maxPosition?.[0]?.position ?? -1) + 1
+    let currentMaxPosition = (maxPositionData?.[0]?.position ?? -1)
 
-    const { data, error } = await supabase
-      .from("playlist_songs")
-      .insert({
-        playlist_id: params.id,
-        song_id,
-        position,
+    // Handle single or multiple song additions
+    if (song_ids && Array.isArray(song_ids)) {
+      // Batch insert
+      const songsToInsert = song_ids.map((id, index) => {
+        return {
+          playlist_id: params.id,
+          song_id: id,
+          position: currentMaxPosition + 1 + index,
+        }
       })
-      .select()
 
-    if (error) throw error
+      const { data, error } = await supabase.from("playlist_songs").insert(songsToInsert).select()
 
-    return NextResponse.json({ playlistSong: data[0] })
+      if (error) throw error
+      
+      return NextResponse.json({ success: true, count: data.length })
+    } else if (song_id) {
+      // Single insert
+      const { data, error } = await supabase
+        .from("playlist_songs")
+        .insert({
+          playlist_id: params.id,
+          song_id,
+          position: currentMaxPosition + 1,
+        })
+        .select()
+
+      if (error) throw error
+      
+      return NextResponse.json({ playlistSong: data[0] })
+    } else {
+      return NextResponse.json({ error: "song_id or song_ids is required" }, { status: 400 })
+    }
+
   } catch (error) {
-    console.error("Error adding song to playlist:", error)
-    return NextResponse.json({ error: "Failed to add song" }, { status: 500 })
+    console.error("Error adding song(s) to playlist:", error)
+    return NextResponse.json({ error: "Failed to add song(s)" }, { status: 500 })
   }
 }
 

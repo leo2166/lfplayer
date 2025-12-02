@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/use-toast";
 import PlaylistCard from "@/components/playlist-card"
 import CreatePlaylistDialog from "@/components/create-playlist-dialog"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
+import { useUserRole } from "@/contexts/UserRoleContext"
 
 interface Playlist {
   id: string
@@ -21,6 +22,7 @@ interface Playlist {
 
 export default function PlaylistsPage() {
   const router = useRouter()
+  const userRole = useUserRole()
   const [user, setUser] = useState<any>(null)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -148,7 +150,7 @@ export default function PlaylistsPage() {
               Mis Playlists
             </h1>
           </div>
-          <CreatePlaylistDialog onCreate={() => fetchPlaylists()} />
+          {userRole === 'admin' && <CreatePlaylistDialog onCreate={() => fetchPlaylists()} />}
         </div>
       </header>
 
