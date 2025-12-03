@@ -9,7 +9,7 @@ interface PlaylistCardProps {
   description?: string
   songCount: number
   coverColor: string
-  onDelete: () => void
+  onDelete?: () => void
   onSelect: () => void
   onPlay: () => void
 }
@@ -20,7 +20,7 @@ export default function PlaylistCard({
   description,
   songCount,
   coverColor,
-  onDelete,
+  onDelete, // Make sure onDelete is optional here too
   onSelect,
   onPlay,
 }: PlaylistCardProps) {
@@ -48,17 +48,19 @@ export default function PlaylistCard({
 
       {/* Actions */}
       <div className="absolute top-2 right-2 flex items-center gap-2 transition-opacity">
-        <Button
-          size="icon"
-          variant="destructive"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-700"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        {onDelete && ( // Conditionally render delete button
+          <Button
+            size="icon"
+            variant="destructive"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+            className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-700"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
         <Button
           size="icon"
           onClick={(e) => {

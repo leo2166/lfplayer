@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
 import { useUserRole } from "@/contexts/UserRoleContext"
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
+import GenreManagementDialog from "@/components/genre-management-dialog" // NEW IMPORT
 
 export default function ClientLayout({
   children,
@@ -126,6 +127,11 @@ export default function ClientLayout({
                   <PlusCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">Agregar Música</span>
                 </button>
+              )}
+
+              {/* Genre Management Button (only for admin) */}
+              {userRole === 'admin' && (
+                <GenreManagementDialog />
               )}
             </nav>
 

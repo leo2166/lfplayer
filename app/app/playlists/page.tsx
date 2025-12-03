@@ -35,12 +35,7 @@ export default function PlaylistsPage() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      if (!user) {
-        router.push("/auth/login")
-        return
-      }
-
-      setUser(user)
+      setUser(user) // Set user, which will be null for guests
       await fetchPlaylists()
       setIsLoading(false)
     }
@@ -171,7 +166,7 @@ export default function PlaylistsPage() {
                 description={playlist.description}
                 songCount={playlist.song_count || 0}
                 coverColor={playlist.cover_color}
-                onDelete={() => handleDeletePlaylist(playlist.id)}
+                onDelete={userRole === 'admin' ? () => handleDeletePlaylist(playlist.id) : undefined}
                 onSelect={() => handlePlaylistSelect(playlist.id)}
                 onPlay={() => handlePlayPlaylist(playlist.id)}
               />
