@@ -20,7 +20,10 @@ export default function ClientLayout({
   const userRole = useUserRole()
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
   const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook

@@ -70,6 +70,23 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
     }, {} as Record<string, Song[]>)
   }, [filteredSongs])
 
+  if (!hasMounted) {
+    return (
+        <div className="w-full h-full p-4 md:p-8 space-y-8">
+            <div className="space-y-4">
+                <div className="h-10 w-1/4 bg-muted rounded-lg animate-pulse" />
+                <div className="h-6 w-1/2 bg-muted rounded-lg animate-pulse" />
+            </div>
+             <div className="h-12 w-full bg-muted rounded-lg animate-pulse" />
+            <div className="space-y-2">
+                <div className="h-20 w-full bg-muted rounded-lg animate-pulse" />
+                <div className="h-20 w-full bg-muted rounded-lg animate-pulse" />
+                <div className="h-20 w-full bg-muted rounded-lg animate-pulse" />
+            </div>
+        </div>
+    )
+  }
+
   const handlePlay = (song: Song) => {
     playSong(song, filteredSongs)
   }
@@ -202,13 +219,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         )}
       </div>
       
-      {hasMounted && (
-        <>
 
-
-
-        </>
-      )}
     </>
   )
 }
