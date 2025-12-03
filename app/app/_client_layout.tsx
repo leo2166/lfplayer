@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Music, Menu, X, ListMusic, PlusCircle, Download, LogOut } from "lucide-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@supabase/ssr"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
