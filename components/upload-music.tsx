@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group" // NEW IMPORT
 
 interface Genre {
   id: string
@@ -19,6 +20,7 @@ interface Genre {
 interface UploadMusicProps {
   genres: Genre[]
   onUploadSuccess?: (songs: any[]) => void
+  preselectedArtist?: string // NEW PROP
 }
 
 interface UploadError {
@@ -26,7 +28,7 @@ interface UploadError {
   reason: string
 }
 
-export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProps) {
+export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist }: UploadMusicProps) {
   const [genre_id, setGenreId] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -36,6 +38,30 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
   const [successCount, setSuccessCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+
+  const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder'); // NEW STATE
+  const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || ""); // NEW STATE
+
+  useEffect(() => {
+    if (preselectedArtist) {
+      setArtistNameInput(preselectedArtist);
+      setUploadMode('files'); // Force files mode if artist pre-selected
+    } else {
+      setArtistNameInput(""); // Clear artist input if no preselected artist
+      // uploadMode is not explicitly set here, it defaults to 'folder' initially
+    }
+  }, [preselectedArtist]); // Only run when preselectedArtist changes
+
+  useEffect(() => {
+    // Clear files if mode changes
+    setFiles([]);
+    setError(null);
+    setUploadErrors([]);
+    setSuccessCount(0);
+    // Clear input refs when mode changes to prevent accidental re-upload
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  }, [uploadMode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFiles([])
@@ -57,6 +83,11 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
 
     if (files.length === 0 || !genre_id) {
       setError("Por favor selecciona archivos de audio y un género")
+      return
+    }
+
+    if (uploadMode === 'files' && !artistNameInput.trim()) { // Validate artist name for individual files
+      setError("Por favor ingresa el nombre del artista para los archivos individuales.")
       return
     }
 
@@ -139,9 +170,15 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
           }
         })
 
-        const artistName = originalFile.webkitRelativePath
-          ? originalFile.webkitRelativePath.split("/")[0]
-          : "Varios Artistas"
+        let songArtistName = artistNameInput.trim();
+        
+        if (uploadMode === 'folder' && !songArtistName && originalFile.webkitRelativePath) {
+            songArtistName = originalFile.webkitRelativePath.split("/")[0];
+        }
+
+        if (!songArtistName) {
+            songArtistName = "Varios Artistas";
+        }
 
         return {
           title: originalFile.name.replace(/\.mp3$/i, ""),
@@ -195,10 +232,44 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
     <div className="rounded-lg border border-border bg-card p-6">
       <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
         <Upload className="w-5 h-5 text-purple-600" />
-        Subir Canciones por Lote
+        Subir Música
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Upload Mode Toggle */}
+        <div className="flex flex-col space-y-2">
+            <Label>Modo de Subida</Label>
+            <ToggleGroup 
+                type="single" 
+                value={uploadMode} 
+                onValueChange={(value: "files" | "folder") => value && setUploadMode(value)} 
+                className="w-full justify-start"
+                disabled={!!preselectedArtist} // Disable if artist pre-selected
+            >
+                <ToggleGroupItem value="files" className="flex-1">
+                    Seleccionar Archivos
+                </ToggleGroupItem>
+                <ToggleGroupItem value="folder" className="flex-1">
+                    Seleccionar Carpeta
+                </ToggleGroupItem>
+            </ToggleGroup>
+        </div>
+
+        {/* Artist Input */}
+        {(uploadMode === 'files' || preselectedArtist) && (
+            <div>
+                <Label htmlFor="artistName">Nombre del Artista *</Label>
+                <Input
+                    id="artistName"
+                    value={artistNameInput}
+                    onChange={(e) => setArtistNameInput(e.target.value)}
+                    placeholder="Ej: Queen"
+                    className="mt-1"
+                    disabled={!!preselectedArtist} // Disable if preselectedArtist is provided
+                />
+            </div>
+        )}
+
         <div>
           <Label htmlFor="genre">Género para todas las canciones *</Label>
           <Select value={genre_id} onValueChange={setGenreId}>
@@ -216,18 +287,21 @@ export default function UploadMusic({ genres, onUploadSuccess }: UploadMusicProp
         </div>
 
         <div>
-          <Label htmlFor="file">Archivos o Carpetas de Audio *</Label>
+          <Label htmlFor="file">Archivos de Audio *</Label>
           <div className="hidden">
             <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3" multiple />
             <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3" multiple webkitdirectory="" />
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" onClick={() => document.getElementById('file-upload')?.click()} className="flex-shrink-0">
-              Seleccionar Archivos
-            </Button>
-            <Button type="button" variant="outline" onClick={() => document.getElementById('folder-upload')?.click()} className="flex-shrink-0">
-              Seleccionar Carpeta
-            </Button>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            {uploadMode === 'files' ? (
+                <Button type="button" variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
+                    Seleccionar Archivos
+                </Button>
+            ) : (
+                <Button type="button" variant="outline" onClick={() => document.getElementById('folder-upload')?.click()}>
+                    Seleccionar Carpeta
+                </Button>
+            )}
           </div>
           {files.length > 0 && (
             <p className="text-sm text-muted-foreground mt-2">

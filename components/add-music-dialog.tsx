@@ -22,9 +22,10 @@ interface AddMusicDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUploadSuccess: (songs: any[]) => void
+  preselectedArtist?: string // NEW PROP
 }
 
-export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess }: AddMusicDialogProps) {
+export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, preselectedArtist }: AddMusicDialogProps) {
   const [genres, setGenres] = useState<Genre[]>([])
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess }: 
   const handleSuccess = (songs: any[]) => {
     onUploadSuccess(songs)
     // Optional: Close dialog on success
-    // onOpenChange(false) 
+    // onOpenChange(false)
   }
 
   return (
@@ -59,7 +60,7 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess }: 
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4">
-          <UploadMusic genres={genres} onUploadSuccess={handleSuccess} />
+          <UploadMusic genres={genres} onUploadSuccess={handleSuccess} preselectedArtist={preselectedArtist} />
         </div>
       </DialogContent>
     </Dialog>

@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import GenreFilter from "@/components/genre-filter"
 import SongCard from "@/components/song-card"
+import AddMusicDialog from "@/components/add-music-dialog" // NEW IMPORT
 import { Folder, Music, Trash2, Loader2, ChevronDownIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -42,6 +43,8 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const [deletingSong, setDeletingSong] = useState<Song | null>(null)
   // State to prevent hydration errors
   const [hasMounted, setHasMounted] = useState(false)
+  const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false) // New state
+  const [artistToAddSongTo, setArtistToAddSongTo] = useState<string | undefined>(undefined) // New state
 
   useEffect(() => {
     setHasMounted(true);
@@ -176,18 +179,32 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                   <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
                 </AccordionPrimitive.Trigger>
                 {userRole === 'admin' && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="opacity-0 group-hover:opacity-100 transition-opacity" 
-                    onClick={(e) => {
-                      e.stopPropagation(); 
-                      handleDeleteArtist(artist); 
-                    }}
-                    disabled={deletingArtist === artist}
-                  >
-                    {deletingArtist === artist ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="w-5 h-5 text-destructive" />}
-                  </Button>
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArtistToAddSongTo(artist);
+                        setAddIndividualMusicOpen(true);
+                      }}
+                      className="h-8 w-8 text-primary hover:bg-primary/10"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteArtist(artist);
+                      }}
+                      disabled={deletingArtist === artist}
+                      className="h-8 w-8"
+                    >
+                      {deletingArtist === artist ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                    </Button>
+                  </div>
                 )}
               </AccordionPrimitive.Header>
               <AccordionContent className="px-4 pt-2 pb-4">
@@ -217,10 +234,17 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
             <p className="text-sm text-muted-foreground/80">Intenta seleccionar otro género o agrega nueva música.</p>
           </div>
         )}
-      </div>
-      
-
-    </>
+            </div>
+            <AddMusicDialog
+              open={isAddIndividualMusicOpen}
+              onOpenChange={setAddIndividualMusicOpen}
+              onUploadSuccess={() => {
+                setAddIndividualMusicOpen(false);
+                router.refresh();
+              }}
+              preselectedArtist={artistToAddSongTo}
+            />
+          </>
   )
 }
 
