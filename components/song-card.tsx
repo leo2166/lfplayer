@@ -34,9 +34,9 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Music className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <h3 className="font-semibold text-foreground truncate">{title}</h3>
+            <h3 className="font-semibold text-foreground sm:truncate">{title}</h3>
           </div>
-          {artist && <p className="text-sm text-muted-foreground truncate">{artist}</p>}
+          {artist && <p className="text-sm text-muted-foreground sm:truncate">{artist}</p>}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {genre && (
               <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200">
