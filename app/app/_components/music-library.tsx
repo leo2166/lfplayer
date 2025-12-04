@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import GenreFilter from "@/components/genre-filter"
 import SongCard from "@/components/song-card"
 import AddMusicDialog from "@/components/add-music-dialog" // NEW IMPORT
-import { Folder, Music, Trash2, Loader2, ChevronDownIcon } from "lucide-react"
+import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MusicLibraryProps {
