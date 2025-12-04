@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
 import { useUserRole } from "@/contexts/UserRoleContext"
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
-import GenreManagementDialog from "@/components/genre-management-dialog" // NEW IMPORT
 
 export default function ClientLayout({
   children,
@@ -128,24 +127,23 @@ export default function ClientLayout({
                   <span className="font-medium">Agregar Música</span>
                 </button>
               )}
-
-              {/* Genre Management Button (only for admin) */}
-              {userRole === 'admin' && (
-                <GenreManagementDialog />
-              )}
             </nav>
 
             {/* Footer Info & Logout */}
             <div className="p-4 border-t border-border">
-              {userRole !== 'guest' && (
+              {/* Sign Out Button - Always visible, styled with gradient */}
+              <div className="gradient-border mb-2">
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left text-muted-foreground hover:text-foreground hover:bg-accent mb-2"
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+                    'gradient-border-button-inner text-foreground hover:bg-accent',
+                  )}
                 >
                   <LogOut className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">Cerrar Sesión</span>
                 </button>
-              )}
+              </div>
               <div className="text-xs text-muted-foreground text-center">
                 <p>Preferencia Musical v1.0</p>
                 <p>Propiedad de Ing. Lucidio Fuenmayor.</p>
