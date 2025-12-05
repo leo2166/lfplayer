@@ -160,7 +160,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         throw new Error("Ninguna canción pudo ser subida.")
       }
 
-      const songsDataPromises = successfulUploads.map(async ({ downloadUrl, originalFile }) => {
+        const songsDataPromises = successfulUploads.map(async ({ downloadUrl, originalFile }) => {
         const audio = new Audio(downloadUrl)
         const duration = await new Promise<number>((resolve) => {
           audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
@@ -170,19 +170,25 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           }
         })
 
+        // Determine artist name based on priority: artistNameInput (prefilled from preselectedArtist or manual input),
+        // then webkitRelativePath (for folder uploads), then default to "Varios Artistas"
         let songArtistName = artistNameInput.trim();
         
+        console.log("DEBUG Artist Derivation - initial songArtistName:", songArtistName, "uploadMode:", uploadMode, "originalFile.webkitRelativePath:", originalFile.webkitRelativePath); // DEBUG LOG
+
         if (uploadMode === 'folder' && !songArtistName && originalFile.webkitRelativePath) {
             songArtistName = originalFile.webkitRelativePath.split("/")[0];
+            console.log("DEBUG Artist Derivation - derived from folder path:", songArtistName); // DEBUG LOG
         }
 
         if (!songArtistName) {
             songArtistName = "Varios Artistas";
+            console.log("DEBUG Artist Derivation - defaulted to Varios Artistas"); // DEBUG LOG
         }
 
         return {
           title: originalFile.name.replace(/\.mp3$/i, ""),
-          artist: artistName,
+          artist: songArtistName,
           genre_id,
           blob_url: downloadUrl,
           duration,
@@ -212,6 +218,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
       // Reset form
       setFiles([])
+      setArtistNameInput(preselectedArtist || ""); // Reset artist input to preselected or empty
       if (fileInputRef.current) fileInputRef.current.value = ""
       if (folderInputRef.current) folderInputRef.current.value = ""
       
@@ -287,18 +294,20 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         </div>
 
         <div>
-          <Label htmlFor="file">Archivos de Audio *</Label>
+          <Label>
+            {uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}
+          </Label>
           <div className="hidden">
             <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3" multiple />
             <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3" multiple webkitdirectory="" />
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {uploadMode === 'files' ? (
-                <Button type="button" variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                     Seleccionar Archivos
                 </Button>
             ) : (
-                <Button type="button" variant="outline" onClick={() => document.getElementById('folder-upload')?.click()}>
+                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()}>
                     Seleccionar Carpeta
                 </Button>
             )}
