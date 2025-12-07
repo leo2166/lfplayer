@@ -243,36 +243,15 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Upload Mode Toggle */}
-        <div className="flex flex-col space-y-2">
-            <Label>Modo de Subida</Label>
-            <ToggleGroup 
-                type="single" 
-                value={uploadMode} 
-                onValueChange={(value: "files" | "folder") => value && setUploadMode(value)} 
-                className="w-full justify-start"
-                disabled={!!preselectedArtist} // Disable if artist pre-selected
-            >
-                <ToggleGroupItem value="files" className="flex-1">
-                    Seleccionar Archivos
-                </ToggleGroupItem>
-                <ToggleGroupItem value="folder" className="flex-1">
-                    Seleccionar Carpeta
-                </ToggleGroupItem>
-            </ToggleGroup>
-        </div>
-
-        {/* Artist Input */}
-        {(uploadMode === 'files' || preselectedArtist) && (
+        {/* Artist Input - Rendered only when adding to an existing artist */}
+        {preselectedArtist && (
             <div>
-                <Label htmlFor="artistName">Nombre del Artista *</Label>
+                <Label htmlFor="artistName">Añadir canciones a</Label>
                 <Input
                     id="artistName"
                     value={artistNameInput}
-                    onChange={(e) => setArtistNameInput(e.target.value)}
-                    placeholder="Ej: Queen"
                     className="mt-1"
-                    disabled={!!preselectedArtist} // Disable if preselectedArtist is provided
+                    disabled
                 />
             </div>
         )}

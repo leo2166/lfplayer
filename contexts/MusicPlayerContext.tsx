@@ -15,6 +15,7 @@ interface MusicPlayerContextType {
   playPrev: () => void
   seek: (time: number) => void
   setCurrentTime: (time: number) => void
+  closePlayer: () => void
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined)
@@ -69,6 +70,13 @@ export const MusicPlayerProvider = ({ children }: { children: ReactNode }) => {
     setCurrentTime(time)
   }
 
+  const closePlayer = () => {
+    setIsPlaying(false)
+    setCurrentSong(null)
+    setSongs([])
+    setCurrentTime(0)
+  }
+
   return (
     <MusicPlayerContext.Provider
       value={{
@@ -82,6 +90,7 @@ export const MusicPlayerProvider = ({ children }: { children: ReactNode }) => {
         playPrev,
         seek,
         setCurrentTime,
+        closePlayer,
       }}
     >
       {children}

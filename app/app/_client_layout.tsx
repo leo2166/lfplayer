@@ -127,23 +127,24 @@ export default function ClientLayout({
                   <span className="font-medium">Agregar Música</span>
                 </button>
               )}
-            </nav>
 
-            {/* Footer Info & Logout */}
-            <div className="p-4 border-t border-border">
-              {/* Sign Out Button - Always visible, styled with gradient */}
-              <div className="gradient-border mb-2">
+              {/* Sign Out Button - Moved into navigation */}
+              <div className="pt-4 mt-4 border-t border-border">
                 <button
                   onClick={handleSignOut}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
-                    'gradient-border-button-inner text-foreground hover:bg-accent',
+                    "text-muted-foreground hover:text-foreground hover:bg-accent",
                   )}
                 >
-                  <LogOut className="w-5 h-5 flex-shrink-0" />
+                  <LogOut className="w-5 h-5 flex-shrink-0 text-red-500" />
                   <span className="font-medium">Cerrar Sesión</span>
                 </button>
               </div>
+            </nav>
+
+            {/* Footer Info */}
+            <div className="p-4 border-t border-border">
               <div className="text-xs text-muted-foreground text-center">
                 <p>Preferencia Musical v1.0</p>
                 <p>Propiedad de Ing. Lucidio Fuenmayor.</p>
