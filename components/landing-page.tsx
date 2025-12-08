@@ -3,30 +3,12 @@
 import Link from "next/link"
 import { Music, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
-import { createBrowserClient } from "@supabase/ssr"
-import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function LandingPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const router = useRouter()
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setIsLoggedIn(!!user)
-    }
-    checkUser()
-  }, [supabase.auth])
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    setIsLoggedIn(false)
-    router.push("/") // Redirect to landing page after logout
+  const handleExit = () => {
+    toast("Cerrando la aplicación... (Si la ventana no se cierra, hazlo manualmente.)")
+    window.close()
   }
 
   return (
@@ -56,17 +38,15 @@ export default function LandingPage() {
               Iniciar Sesión como Administrador
             </Button>
           </Link>
-          {isLoggedIn && (
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleSignOut}
-              className="w-full border-red-400 text-red-300 hover:bg-red-900 hover:text-white shadow-lg transform hover:scale-105 transition-transform flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-5 h-5" />
-              Salir
-            </Button>
-          )}
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={handleExit}
+            className="w-full border-red-400 text-red-300 hover:bg-red-900 hover:text-white shadow-lg transform hover:scale-105 transition-transform flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-5 h-5" />
+            Salir
+          </Button>
         </div>
       </div>
     </div>
