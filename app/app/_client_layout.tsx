@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
 import { useUserRole } from "@/contexts/UserRoleContext"
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
 
 export default function ClientLayout({
@@ -20,6 +21,7 @@ export default function ClientLayout({
   const userRole = useUserRole()
   const pathname = usePathname()
   const router = useRouter()
+  const { closePlayer } = useMusicPlayer()
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -47,6 +49,7 @@ export default function ClientLayout({
   }
 
   const handleSignOut = async () => {
+    closePlayer()
     await supabase.auth.signOut()
     router.push("/")
   }
