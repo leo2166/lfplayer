@@ -1,20 +1,12 @@
-"use client"
-
 import Link from "next/link"
 import { Music, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
 
 export default function LandingPage() {
   const handleExit = () => {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      toast.info("En móvil, debes cerrar la pestaña del navegador manualmente.");
-    } else {
-      toast("Cerrando la aplicación...");
-      window.close();
-    }
+    // Attempt to close the window. This is not guaranteed to work,
+    // especially in modern browsers or PWAs, due to security restrictions.
+    window.open("", "_self")?.close()
   }
 
   return (
