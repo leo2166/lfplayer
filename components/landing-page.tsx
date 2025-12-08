@@ -1,14 +1,8 @@
 import Link from "next/link"
-import { Music, LogOut } from "lucide-react"
+import { Music } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function LandingPage() {
-  const handleExit = () => {
-    // Attempt to close the window. This is not guaranteed to work,
-    // especially in modern browsers or PWAs, due to security restrictions.
-    window.open("", "_self")?.close()
-  }
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-purple-900 to-pink-900 text-white">
       <div className="bg-card/90 backdrop-blur-sm rounded-xl shadow-2xl p-8 md:p-12 text-center max-w-lg w-full transform transition-all duration-300 hover:scale-105 hover:shadow-purple-500/30">
@@ -36,14 +30,6 @@ export default function LandingPage() {
               Iniciar Sesión como Administrador
             </Button>
           </Link>
-          <Button
-            size="lg"
-            onClick={handleExit}
-            className="w-full bg-red-600 text-white hover:bg-red-700 shadow-lg transform hover:scale-105 transition-transform flex items-center justify-center gap-2"
-          >
-            <LogOut className="w-5 h-5" />
-            Salir
-          </Button>
         </div>
       </div>
     </div>

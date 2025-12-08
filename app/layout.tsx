@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import GlobalMusicPlayer from "@/components/global-music-player"
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext"
-import { Toaster } from "sonner"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -47,7 +46,6 @@ export default function RootLayout({
         <MusicPlayerProvider>
           {children}
           <GlobalMusicPlayer />
-          <Toaster richColors position="top-center" />
         </MusicPlayerProvider>
         <Analytics />
       </body>
