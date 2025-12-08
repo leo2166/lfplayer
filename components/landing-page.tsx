@@ -7,8 +7,14 @@ import { toast } from "sonner"
 
 export default function LandingPage() {
   const handleExit = () => {
-    toast("Cerrando la aplicación... (Si la ventana no se cierra, hazlo manualmente.)")
-    window.close()
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      toast.info("En móvil, debes cerrar la pestaña del navegador manualmente.");
+    } else {
+      toast("Cerrando la aplicación...");
+      window.close();
+    }
   }
 
   return (
@@ -40,9 +46,8 @@ export default function LandingPage() {
           </Link>
           <Button
             size="lg"
-            variant="outline"
             onClick={handleExit}
-            className="w-full border-red-400 text-red-300 hover:bg-red-900 hover:text-white shadow-lg transform hover:scale-105 transition-transform flex items-center justify-center gap-2"
+            className="w-full bg-red-600 text-white hover:bg-red-700 shadow-lg transform hover:scale-105 transition-transform flex items-center justify-center gap-2"
           >
             <LogOut className="w-5 h-5" />
             Salir
