@@ -22,7 +22,7 @@ export default function LandingPage() {
         </div>
 
         <p className="text-lg text-muted-foreground mb-8">
-          Tu plataforma personalizada para disfrutar y gestionar tu música.
+          Mi biblioteca de música personalizada que puedes disfrutar si entras como invitado
         </p>
 
         <div className="space-y-4">
