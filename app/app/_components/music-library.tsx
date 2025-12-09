@@ -55,6 +55,14 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   // State for delete summary modal
   const [showDeleteSummary, setShowDeleteSummary] = useState(false);
   const [deleteSummary, setDeleteSummary] = useState<DeleteSummary | null>(null);
+  const [deleteSummaryTitle, setDeleteSummaryTitle] = useState("Resumen de Eliminación");
+
+
+  // State for delete by date
+  const [deleteDate, setDeleteDate] = useState('');
+  const [isDeletingByDate, setIsDeletingByDate] = useState(false);
+  const [showDateDeleteConfirm, setShowDateDeleteConfirm] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -120,6 +128,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.dismiss(toastId); // Dismiss loading toast
+      setDeleteSummaryTitle(`Resumen de Eliminación - ${artist}`); // Set dynamic title
       setDeleteSummary(result.summary); // Set the summary data
       setShowDeleteSummary(true);     // Show the summary modal
       router.refresh(); // Refresh the library view
@@ -156,6 +165,42 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
     }
   };
 
+  // --- Delete by Date Logic ---
+  const handleDeleteByDate = async () => {
+    if (!deleteDate || isDeletingByDate) return;
+
+    setIsDeletingByDate(true);
+    setShowDateDeleteConfirm(false);
+    const toastId = toast.loading(`Eliminando canciones de la fecha ${deleteDate}...`);
+
+    try {
+      const response = await fetch('/api/delete-by-date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: deleteDate }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error en el servidor.');
+      }
+      
+      toast.dismiss(toastId);
+      setDeleteSummaryTitle(`Resumen de Eliminación - ${deleteDate}`);
+      setDeleteSummary(result.summary);
+      setShowDeleteSummary(true);
+      setDeleteDate(""); // Reset date input
+      router.refresh();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsDeletingByDate(false);
+    }
+  };
+
+
   return (
     <>
       <div className="w-full h-full p-4 md:p-8 space-y-8">
@@ -167,6 +212,30 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
             </p>
           </div>
         </header>
+
+        {userRole === 'admin' && (
+          <div className="bg-card/50 border border-border rounded-lg p-4 space-y-4">
+            <h3 className="font-semibold text-lg">Panel de Administrador</h3>
+             <div className="flex flex-col sm:flex-row items-center gap-4">
+                <p className="text-sm text-muted-foreground flex-shrink-0">Eliminar todo lo subido en una fecha:</p>
+                <Input
+                    type="date"
+                    value={deleteDate}
+                    onChange={(e) => setDeleteDate(e.target.value)}
+                    className="w-full sm:w-auto"
+                    disabled={isDeletingByDate}
+                />
+                <Button
+                    variant="destructive"
+                    onClick={() => setShowDateDeleteConfirm(true)}
+                    disabled={!deleteDate || isDeletingByDate}
+                >
+                    {isDeletingByDate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Eliminar por Fecha
+                </Button>
+            </div>
+          </div>
+        )}
 
         <GenreFilter
           genres={genres}
@@ -261,11 +330,11 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
             <AlertDialog open={showDeleteSummary} onOpenChange={setShowDeleteSummary}>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Resumen de Eliminación del Artista</AlertDialogTitle>
+                  <AlertDialogTitle>{deleteSummaryTitle}</AlertDialogTitle>
                   <AlertDialogDescription>
                     {deleteSummary ? (
                       <div className="space-y-2 text-base">
-                        <p>Se encontraron **{deleteSummary.totalSongs}** canciones para este artista.</p>
+                        <p>Se encontraron **{deleteSummary.totalSongs}** canciones.</p>
                         <p>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</p>
                         <p>El rastro en la base de datos de Supabase fue eliminado.</p>
                       </div>
@@ -275,9 +344,37 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => setShowDeleteSummary(false)}>Continuar</AlertDialogAction>
+                  <AlertDialogAction onClick={() => {
+                    setShowDeleteSummary(false);
+                    setDeleteSummary(null);
+                  }}>
+                    Continuar
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete by Date Confirmation Dialog */}
+            <AlertDialog open={showDateDeleteConfirm} onOpenChange={setShowDateDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción es irreversible. Se eliminarán permanentemente todas las canciones
+                            subidas en la fecha **{deleteDate}**. Esto incluye los archivos de audio
+                            y los registros en la base de datos.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteByDate}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Sí, eliminar todo
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
             </AlertDialog>
           </>
   )
