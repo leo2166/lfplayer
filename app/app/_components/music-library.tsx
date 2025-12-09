@@ -216,7 +216,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                       artist={song.artist}
                       duration={song.duration || 0}
                       genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
-                      onPlay={() => handlePlay(song)}
+                      onPlay={() => handlePlay(song, artistSongs)}
                       onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
                       isDeleting={deletingSong?.id === song.id}
                       isPlaying={isPlaying && currentSong?.id === song.id}
