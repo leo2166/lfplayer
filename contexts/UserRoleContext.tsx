@@ -1,14 +1,21 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 
 type UserRole = 'admin' | 'user' | 'guest';
 
-const UserRoleContext = createContext<UserRole | undefined>(undefined);
+interface UserRoleContextType {
+  role: UserRole;
+  setRole: Dispatch<SetStateAction<UserRole>>;
+}
 
-export function UserRoleProvider({ children, role }: { children: ReactNode; role: UserRole }) {
+const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
+
+export function UserRoleProvider({ children, initialRole }: { children: ReactNode; initialRole: UserRole }) {
+  const [role, setRole] = useState<UserRole>(initialRole);
+
   return (
-    <UserRoleContext.Provider value={role}>
+    <UserRoleContext.Provider value={{ role, setRole }}>
       {children}
     </UserRoleContext.Provider>
   );
@@ -17,7 +24,17 @@ export function UserRoleProvider({ children, role }: { children: ReactNode; role
 export function useUserRole() {
   const context = useContext(UserRoleContext);
   if (context === undefined) {
-    throw new Error('useUserRole must be used within a UserRoleProvider');
+    // This will just return 'guest' if used outside the provider, which is safer
+    // for components that might render on public pages.
+    return 'guest'; 
   }
-  return context;
+  return context.role;
+}
+
+export function useSetUserRole() {
+  const context = useContext(UserRoleContext);
+  if (context === undefined) {
+    throw new Error('useSetUserRole must be used within a UserRoleProvider');
+  }
+  return context.setRole;
 }

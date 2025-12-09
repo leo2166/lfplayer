@@ -30,7 +30,7 @@ export default async function RootLayout({
   console.log("User role determined on server:", userRole)
 
   return (
-    <UserRoleProvider role={userRole as any}>
+    <UserRoleProvider initialRole={userRole as any}>
       <ClientLayout>{children}</ClientLayout>
     </UserRoleProvider>
   )

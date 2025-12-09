@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Music, Menu, X, ListMusic, PlusCircle, Download, LogOut } from "lucide-react"
@@ -9,7 +9,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
-import { useUserRole } from "@/contexts/UserRoleContext"
+import { useUserRole, useSetUserRole } from "@/contexts/UserRoleContext"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
 
@@ -19,6 +19,7 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   const userRole = useUserRole()
+  const setRole = useSetUserRole()
   const pathname = usePathname()
   const router = useRouter()
   const { closePlayer } = useMusicPlayer()
@@ -29,6 +30,32 @@ export default function ClientLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
   const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        // Fetch user profile to get role
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single()
+        
+        setRole((profile?.role as any) || 'user')
+        console.log("Auth state changed: SIGNED_IN, role set to", profile?.role)
+      } else if (event === "SIGNED_OUT") {
+        setRole("guest")
+        console.log("Auth state changed: SIGNED_OUT, role set to guest")
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase, setRole])
+  
 
   const navItems = [
     {
