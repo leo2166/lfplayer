@@ -63,6 +63,11 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const [isDeletingByDate, setIsDeletingByDate] = useState(false);
   const [showDateDeleteConfirm, setShowDateDeleteConfirm] = useState(false);
 
+  // State for orphan file check
+  const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
+  const [showOrphanResult, setShowOrphanResult] = useState(false);
+  const [orphanResult, setOrphanResult] = useState<any>(null);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -200,6 +205,29 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
     }
   };
 
+  // --- Orphan File Check Logic ---
+  const handleOrphanCheck = async () => {
+    setIsCheckingOrphans(true);
+    const toastId = toast.loading('Buscando archivos huérfanos en R2...');
+    try {
+      const response = await fetch('/api/cleanup-supabase', {
+        method: 'GET',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error');
+      }
+      toast.dismiss(toastId);
+      setOrphanResult(result);
+      setShowOrphanResult(true);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error en la verificación: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsCheckingOrphans(false);
+    }
+  };
+
 
   return (
     <>
@@ -216,7 +244,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         {userRole === 'admin' && (
           <div className="bg-card/50 border border-border rounded-lg p-4 space-y-4">
             <h3 className="font-semibold text-lg">Panel de Administrador</h3>
-             <div className="flex flex-col sm:flex-row items-center gap-4">
+             <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-border pb-4">
                 <p className="text-sm text-muted-foreground flex-shrink-0">Eliminar todo lo subido en una fecha:</p>
                 <Input
                     type="date"
@@ -232,6 +260,17 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                 >
                     {isDeletingByDate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Eliminar por Fecha
+                </Button>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
+               <p className="text-sm text-muted-foreground flex-shrink-0">Mantenimiento de Almacenamiento:</p>
+               <Button
+                    variant="outline"
+                    onClick={handleOrphanCheck}
+                    disabled={isCheckingOrphans}
+                >
+                    {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Verificar Archivos Huérfanos
                 </Button>
             </div>
           </div>
@@ -373,6 +412,34 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                         >
                             Sí, eliminar todo
                         </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Orphan File Check Results Dialog */}
+            <AlertDialog open={showOrphanResult} onOpenChange={setShowOrphanResult}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Análisis de Archivos Huérfanos Completado</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {orphanResult ? (
+                                <div className="space-y-3 text-base pt-4">
+                                    <p>Total de archivos en Cloudflare R2: <span className="font-bold">{orphanResult.totalR2Files}</span></p>
+                                    <p>Archivos referenciados en Supabase: <span className="font-bold">{orphanResult.totalSupabaseFiles}</span></p>
+                                    <p className="text-lg">Total de archivos huérfanos: <span className="font-bold text-destructive">{orphanResult.orphanFileCount}</span></p>
+                                    {orphanResult.orphanFileCount > 0 && (
+                                        <p className="text-sm text-muted-foreground pt-2">
+                                            Estos archivos existen en el almacenamiento pero no están vinculados a ninguna canción en la base de datos.
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p>No se pudo obtener el resultado del análisis.</p>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction onClick={() => setShowOrphanResult(false)}>Cerrar</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
