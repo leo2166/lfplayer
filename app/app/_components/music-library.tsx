@@ -68,6 +68,10 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const [showOrphanResult, setShowOrphanResult] = useState(false);
   const [orphanResult, setOrphanResult] = useState<any>(null);
 
+  // State for orphan file deletion
+  const [isDeletingOrphans, setIsDeletingOrphans] = useState(false);
+  const [showOrphanDeleteConfirm, setShowOrphanDeleteConfirm] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -228,6 +232,31 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
     }
   };
 
+  // --- Delete Orphan Files Logic ---
+  const handleDeleteOrphans = async () => {
+    setIsDeletingOrphans(true);
+    setShowOrphanDeleteConfirm(false);
+    const toastId = toast.loading(`Eliminando ${orphanResult?.orphanFileCount || ''} archivos huérfanos...`);
+
+    try {
+      const response = await fetch('/api/cleanup-supabase', {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error');
+      }
+      toast.success(`Se eliminaron ${result.deletedCount} archivos huérfanos.`, { id: toastId });
+      setShowOrphanResult(false); // Close the results modal
+      setOrphanResult(null);     // Clear the results
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsDeletingOrphans(false);
+    }
+  };
+
 
   return (
     <>
@@ -267,7 +296,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                <Button
                     variant="outline"
                     onClick={handleOrphanCheck}
-                    disabled={isCheckingOrphans}
+                    disabled={isCheckingOrphans || isDeletingOrphans}
                 >
                     {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Archivos Huérfanos
@@ -439,7 +468,44 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
+                        {orphanResult?.orphanFileCount > 0 && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    setShowOrphanResult(false);
+                                    setShowOrphanDeleteConfirm(true);
+                                }}
+                                disabled={isDeletingOrphans}
+                            >
+                                {isDeletingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                Eliminar Archivos Huérfanos
+                            </Button>
+                        )}
                         <AlertDialogAction onClick={() => setShowOrphanResult(false)}>Cerrar</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+             {/* Orphan Delete Confirmation Dialog */}
+            <AlertDialog open={showOrphanDeleteConfirm} onOpenChange={setShowOrphanDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción es irreversible. Se eliminarán permanentemente 
+                            **{orphanResult?.orphanFileCount}** archivos huérfanos de Cloudflare R2.
+                            Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteOrphans}
+                            className="bg-destructive hover:bg-destructive/90"
+                            disabled={isDeletingOrphans}
+                        >
+                             {isDeletingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sí, eliminar huérfanos'}
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
