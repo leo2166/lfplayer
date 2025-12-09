@@ -94,73 +94,76 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     setIsLoading(true)
     setUploadProgress(0)
 
+    const CHUNK_SIZE = 5; // Process 5 files at a time
+    const allSuccessfulUploads: { downloadUrl: string, originalFile: File }[] = [];
+    const allFailedUploads: UploadError[] = [];
+
     try {
-      const uploadPromises = files.map(async (file, index) => {
-        try {
-          // Step 1: Get a pre-signed URL from our API
-          const presignResponse = await fetch("/api/upload", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              filename: file.name,
-              contentType: file.type,
-            }),
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+          const chunk = files.slice(i, i + CHUNK_SIZE);
+          const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
+          const totalChunks = Math.ceil(files.length / CHUNK_SIZE);
+
+          console.log(`Procesando chunk ${chunkNumber} de ${totalChunks}`);
+
+          const uploadPromises = chunk.map(async (file) => {
+              try {
+                  // Step 1: Get a pre-signed URL
+                  const presignResponse = await fetch("/api/upload", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ filename: file.name, contentType: file.type }),
+                  });
+
+                  if (!presignResponse.ok) {
+                      throw new Error(`No se pudo obtener la URL de subida para ${file.name}`);
+                  }
+                  const { url, downloadUrl } = await presignResponse.json();
+
+                  // Step 2: Upload the file directly to R2
+                  const uploadResponse = await fetch(url, {
+                      method: "PUT",
+                      body: file,
+                      headers: { "Content-Type": file.type },
+                  });
+
+                  if (!uploadResponse.ok) {
+                      throw new Error(`Error al subir ${file.name} a R2`);
+                  }
+                  
+                  return { downloadUrl, originalFile: file };
+              } catch (error) {
+                  throw new Error(error instanceof Error ? error.message : String(error));
+              }
           });
 
-          if (!presignResponse.ok) {
-            throw new Error(`No se pudo obtener la URL de subida para ${file.name}`);
-          }
-          const { url, downloadUrl } = await presignResponse.json();
-          
-          setUploadProgress((prev) => prev + (10 / files.length));
+          const chunkResults = await Promise.allSettled(uploadPromises);
 
-          // Step 2: Upload the file directly to R2 using the pre-signed URL
-          const uploadResponse = await fetch(url, {
-            method: "PUT",
-            body: file,
-            headers: {
-              "Content-Type": file.type,
-            },
+          chunkResults.forEach((result, index) => {
+              const originalFile = chunk[index];
+              if (result.status === 'fulfilled') {
+                  allSuccessfulUploads.push(result.value);
+              } else {
+                  allFailedUploads.push({
+                      fileName: originalFile.name,
+                      reason: result.reason.message,
+                  });
+              }
           });
 
-          if (!uploadResponse.ok) {
-            throw new Error(`Error al subir ${file.name} a R2`);
-          }
+          // Update progress after each chunk
+          const processedFiles = i + chunk.length;
+          setUploadProgress((processedFiles / files.length) * 70); // 70% of progress is for uploading
+      }
 
-          setUploadProgress((prev) => prev + (60 / files.length));
-          
-          return { downloadUrl, originalFile: file };
-        } catch (error) {
-          // We re-throw the error to be caught by Promise.allSettled
-          throw new Error(error instanceof Error ? error.message : String(error));
-        }
-      });
+      setUploadErrors(allFailedUploads);
 
-      const uploadResults = await Promise.allSettled(uploadPromises);
-      setUploadProgress(70)
-
-      const successfulUploads: { downloadUrl: string, originalFile: File }[] = [];
-      const failedUploads: UploadError[] = [];
-
-      uploadResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          successfulUploads.push(result.value);
-        } else {
-          failedUploads.push({
-            fileName: files[index].name,
-            reason: result.reason.message,
-          });
-        }
-      });
-      
-      if (successfulUploads.length === 0) {
-        setUploadErrors(failedUploads)
+      if (allSuccessfulUploads.length === 0) {
         throw new Error("Ninguna canción pudo ser subida.")
       }
 
-        const songsDataPromises = successfulUploads.map(async ({ downloadUrl, originalFile }) => {
+      console.log("Iniciando obtención de metadatos para canciones subidas...");
+      const songsDataPromises = allSuccessfulUploads.map(async ({ downloadUrl, originalFile }) => {
         const audio = new Audio(downloadUrl)
         const duration = await new Promise<number>((resolve) => {
           audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
@@ -170,20 +173,12 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           }
         })
 
-        // Determine artist name based on priority: artistNameInput (prefilled from preselectedArtist or manual input),
-        // then webkitRelativePath (for folder uploads), then default to "Varios Artistas"
         let songArtistName = artistNameInput.trim();
-        
-        console.log("DEBUG Artist Derivation - initial songArtistName:", songArtistName, "uploadMode:", uploadMode, "originalFile.webkitRelativePath:", originalFile.webkitRelativePath); // DEBUG LOG
-
         if (uploadMode === 'folder' && !songArtistName && originalFile.webkitRelativePath) {
             songArtistName = originalFile.webkitRelativePath.split("/")[0];
-            console.log("DEBUG Artist Derivation - derived from folder path:", songArtistName); // DEBUG LOG
         }
-
         if (!songArtistName) {
             songArtistName = "Varios Artistas";
-            console.log("DEBUG Artist Derivation - defaulted to Varios Artistas"); // DEBUG LOG
         }
 
         return {
@@ -196,8 +191,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       })
 
       const songsData = await Promise.all(songsDataPromises)
-      setUploadProgress(85)
+      setUploadProgress(85) // Metadata fetched
       
+      console.log("Guardando datos de canciones en la base de datos...");
       const saveRes = await fetch("/api/songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -214,11 +210,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       
       onUploadSuccess?.(savedSongs.songs)
       setSuccessCount(savedSongs.songs.length);
-      setUploadErrors(failedUploads);
 
       // Reset form
       setFiles([])
-      setArtistNameInput(preselectedArtist || ""); // Reset artist input to preselected or empty
+      setArtistNameInput(preselectedArtist || "");
       if (fileInputRef.current) fileInputRef.current.value = ""
       if (folderInputRef.current) folderInputRef.current.value = ""
       
@@ -231,7 +226,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         setSuccessCount(0)
         setUploadErrors([])
         setError(null)
-      }, 5000)
+      }, 7000) // Increased timeout to see results
     }
   }
 
