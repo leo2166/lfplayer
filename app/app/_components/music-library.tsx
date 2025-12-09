@@ -15,13 +15,13 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion'
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog" // Import AlertDialog components
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import GenreFilter from "@/components/genre-filter"
@@ -35,6 +35,12 @@ interface MusicLibraryProps {
   genres: Genre[]
 }
 
+interface DeleteSummary { // Define the shape of the delete summary
+  totalSongs: number;
+  deletedFromR2: number;
+  deletedFromSupabase: number;
+}
+
 export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const userRole = useUserRole()
   const [selectedGenre, setSelectedGenre] = useState("all")
@@ -45,6 +51,10 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const [hasMounted, setHasMounted] = useState(false)
   const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false) // New state
   const [artistToAddSongTo, setArtistToAddSongTo] = useState<string | undefined>(undefined) // New state
+
+  // State for delete summary modal
+  const [showDeleteSummary, setShowDeleteSummary] = useState(false);
+  const [deleteSummary, setDeleteSummary] = useState<DeleteSummary | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -109,8 +119,10 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       if (!response.ok) {
         throw new Error(result.error || 'Ocurrió un error');
       }
-      toast.success(`Artista '${artist}' eliminado correctamente.`, { id: toastId });
-      setTimeout(() => router.refresh(), 100); // Re-introduce delay for refresh
+      toast.dismiss(toastId); // Dismiss loading toast
+      setDeleteSummary(result.summary); // Set the summary data
+      setShowDeleteSummary(true);     // Show the summary modal
+      router.refresh(); // Refresh the library view
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       const displayError = errorMessage.includes("base de datos") ? errorMessage : `Error al eliminar: ${errorMessage}`;
@@ -244,6 +256,29 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
               }}
               preselectedArtist={artistToAddSongTo}
             />
+
+            {/* Delete Summary AlertDialog */}
+            <AlertDialog open={showDeleteSummary} onOpenChange={setShowDeleteSummary}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Resumen de Eliminación del Artista</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {deleteSummary ? (
+                      <div className="space-y-2 text-base">
+                        <p>Se encontraron **{deleteSummary.totalSongs}** canciones para este artista.</p>
+                        <p>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</p>
+                        <p>El rastro en la base de datos de Supabase fue eliminado.</p>
+                      </div>
+                    ) : (
+                      <p>No se pudo obtener el resumen de eliminación.</p>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => setShowDeleteSummary(false)}>Continuar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
   )
 }
