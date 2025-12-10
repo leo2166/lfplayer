@@ -399,17 +399,15 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>{deleteSummaryTitle}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {deleteSummary ? (
-                      <div className="space-y-2 text-base">
-                        <p>Se encontraron **{deleteSummary.totalSongs}** canciones.</p>
-                        <p>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</p>
-                        <p>El rastro en la base de datos de Supabase fue eliminado.</p>
-                      </div>
-                    ) : (
-                      <p>No se pudo obtener el resumen de eliminación.</p>
-                    )}
-                  </AlertDialogDescription>
+                  {deleteSummary ? (
+                    <div className="space-y-2 text-base text-muted-foreground text-sm">
+                      <div>Se encontraron **{deleteSummary.totalSongs}** canciones.</div>
+                      <div>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</div>
+                      <div>El rastro en la base de datos de Supabase fue eliminado.</div>
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground text-sm">No se pudo obtener el resumen de eliminación.</div>
+                  )}
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogAction onClick={() => {
@@ -450,22 +448,20 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Análisis de Archivos Huérfanos Completado</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {orphanResult ? (
-                                <div className="space-y-3 text-base pt-4">
-                                    <p>Total de archivos en Cloudflare R2: <span className="font-bold">{orphanResult.totalR2Files}</span></p>
-                                    <p>Archivos referenciados en Supabase: <span className="font-bold">{orphanResult.totalSupabaseFiles}</span></p>
-                                    <p className="text-lg">Total de archivos huérfanos: <span className="font-bold text-destructive">{orphanResult.orphanFileCount}</span></p>
-                                    {orphanResult.orphanFileCount > 0 && (
-                                        <p className="text-sm text-muted-foreground pt-2">
-                                            Estos archivos existen en el almacenamiento pero no están vinculados a ninguna canción en la base de datos.
-                                        </p>
-                                    )}
-                                </div>
-                            ) : (
-                                <p>No se pudo obtener el resultado del análisis.</p>
-                            )}
-                        </AlertDialogDescription>
+                        {orphanResult ? (
+                            <div className="space-y-3 text-base pt-4 text-muted-foreground text-sm">
+                                <div>Total de archivos en Cloudflare R2: <span className="font-bold">{orphanResult.totalR2Files}</span></div>
+                                <div>Archivos referenciados en Supabase: <span className="font-bold">{orphanResult.totalSupabaseFiles}</span></div>
+                                <div className="text-lg">Total de archivos huérfanos: <span className="font-bold text-destructive">{orphanResult.orphanFileCount}</span></div>
+                                {orphanResult.orphanFileCount > 0 && (
+                                    <div className="text-sm pt-2">
+                                        Estos archivos existen en el almacenamiento pero no están vinculados a ninguna canción en la base de datos.
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-muted-foreground text-sm">No se pudo obtener el resultado del análisis.</div>
+                        )}
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         {orphanResult?.orphanFileCount > 0 && (

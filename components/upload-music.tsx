@@ -64,7 +64,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   }, [uploadMode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFiles([])
+    // Removed: setFiles([]) - This was redundant and potentially causing issues.
     setError(null)
     setUploadErrors([])
     setSuccessCount(0)
@@ -99,16 +99,17 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     const allFailedUploads: UploadError[] = [];
 
     try {
+      console.log("Paso 1: Iniciando el proceso de subida...");
       for (let i = 0; i < files.length; i += CHUNK_SIZE) {
           const chunk = files.slice(i, i + CHUNK_SIZE);
           const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
           const totalChunks = Math.ceil(files.length / CHUNK_SIZE);
 
-          console.log(`Procesando chunk ${chunkNumber} de ${totalChunks}`);
+          console.log(`Paso 2: Procesando chunk ${chunkNumber} de ${totalChunks}...`);
 
           const uploadPromises = chunk.map(async (file) => {
               try {
-                  // Step 1: Get a pre-signed URL
+                  console.log(`  - Obteniendo URL prefirmada para ${file.name}`);
                   const presignResponse = await fetch("/api/upload", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -120,7 +121,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                   }
                   const { url, downloadUrl } = await presignResponse.json();
 
-                  // Step 2: Upload the file directly to R2
+                  console.log(`  - Subiendo ${file.name} a R2...`);
                   const uploadResponse = await fetch(url, {
                       method: "PUT",
                       body: file,
@@ -131,6 +132,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                       throw new Error(`Error al subir ${file.name} a R2`);
                   }
                   
+                  console.log(`  - Subida de ${file.name} completada.`);
                   return { downloadUrl, originalFile: file };
               } catch (error) {
                   throw new Error(error instanceof Error ? error.message : String(error));
@@ -151,18 +153,18 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
               }
           });
 
-          // Update progress after each chunk
           const processedFiles = i + chunk.length;
-          setUploadProgress((processedFiles / files.length) * 70); // 70% of progress is for uploading
+          setUploadProgress((processedFiles / files.length) * 70);
       }
 
+      console.log("Paso 3: Todas las subidas a R2 completadas.");
       setUploadErrors(allFailedUploads);
 
       if (allSuccessfulUploads.length === 0) {
         throw new Error("Ninguna canción pudo ser subida.")
       }
 
-      console.log("Iniciando obtención de metadatos para canciones subidas...");
+      console.log("Paso 4: Iniciando obtención de metadatos (duración) para canciones subidas...");
       const songsDataPromises = allSuccessfulUploads.map(async ({ downloadUrl, originalFile }) => {
         const audio = new Audio(downloadUrl)
         const duration = await new Promise<number>((resolve) => {
@@ -191,22 +193,25 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       })
 
       const songsData = await Promise.all(songsDataPromises)
-      setUploadProgress(85) // Metadata fetched
+      setUploadProgress(85)
+      console.log("Paso 5: Metadatos obtenidos. Guardando en la base de datos...");
       
-      console.log("Guardando datos de canciones en la base de datos...");
       const saveRes = await fetch("/api/songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(songsData),
       })
+      console.log("Paso 6: La petición a /api/songs ha finalizado.");
 
       if (!saveRes.ok) {
-        const errorData = await saveRes.json().catch(() => ({}))
-        throw new Error(errorData.error || "Error al guardar las canciones en la base de datos")
+        const errorData = await saveRes.json().catch(() => ({}));
+        console.error("Error al guardar en la base de datos (respuesta completa):", errorData);
+        throw new Error(errorData.error || "Error al guardar las canciones en la base de datos");
       }
 
       const savedSongs = await saveRes.json()
       setUploadProgress(100)
+      console.log("Paso 7: Datos guardados exitosamente en la base de datos.");
       
       onUploadSuccess?.(savedSongs.songs)
       setSuccessCount(savedSongs.songs.length);
@@ -218,6 +223,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       if (folderInputRef.current) folderInputRef.current.value = ""
       
     } catch (err) {
+      console.error("Error detallado en handleSubmit:", err);
       setError(err instanceof Error ? err.message : "Ocurrió un error durante la subida")
     } finally {
       setIsLoading(false)

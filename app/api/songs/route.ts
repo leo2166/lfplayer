@@ -92,14 +92,20 @@ export async function POST(request: NextRequest) {
       ]
     }
 
-    const { data, error } = await supabase.from("songs").insert(songsToInsert).select()
-
     if (error) throw error
 
+    console.log("Canciones insertadas en Supabase:", data); // Log the inserted data
+    revalidatePath('/app'); // Invalidate cache for the music library page
     return NextResponse.json({ songs: data })
   } catch (error) {
-    console.error("Error creating song(s):", error)
-    return NextResponse.json({ error: "Failed to create song(s)" }, { status: 500 })
+    console.error("Error creating song(s):", error);
+    let errorMessage = "An unknown error occurred";
+    if (typeof error === 'object' && error !== null && 'message' in error) {
+      errorMessage = (error as { message: string }).message;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return NextResponse.json({ error: `Failed to create song(s): ${errorMessage}` }, { status: 500 });
   }
 }
 
