@@ -15,7 +15,6 @@ export const metadata: Metadata = {
   description: "Tu aplicación de música personal. Crea playlists, organiza por género y reproduce tu música favorita.",
   generator: "v0.app",
   manifest: "/manifest.json", // Añadir manifest
-  themeColor: "#6366f1", // Añadir theme-color
   icons: {
     icon: [
       {
@@ -34,6 +33,11 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
 }
+
+export const viewport = {
+  themeColor: "#6366f1",
+  colorScheme: 'dark light',
+};
 
 export default function RootLayout({
   children,

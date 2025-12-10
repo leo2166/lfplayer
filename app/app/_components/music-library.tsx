@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation" 
 import type { Song, Genre } from "@/lib/types"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useUserRole } from "@/contexts/UserRoleContext"
+import { useMusicLibrary } from "@/contexts/MusicLibraryContext" // NEW IMPORT
 import { toast } from "sonner"
 import {
   Accordion,
@@ -30,19 +31,15 @@ import AddMusicDialog from "@/components/add-music-dialog" // NEW IMPORT
 import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface MusicLibraryProps {
-  songs: Song[]
-  genres: Genre[]
-}
-
 interface DeleteSummary { // Define the shape of the delete summary
   totalSongs: number;
   deletedFromR2: number;
   deletedFromSupabase: number;
 }
 
-export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
+export default function MusicLibrary() { // Props removed
   const userRole = useUserRole()
+  const { songs, genres, refetchSongs } = useMusicLibrary() // Consume context
   const [selectedGenre, setSelectedGenre] = useState("all")
   const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
   // State for single song deletion
@@ -72,24 +69,46 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
   const [isDeletingOrphans, setIsDeletingOrphans] = useState(false);
   const [showOrphanDeleteConfirm, setShowOrphanDeleteConfirm] = useState(false);
 
+  // State for broken link check
+  const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
+  const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
+  const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
+
+  // State for broken link deletion
+  const [isDeletingBrokenLinks, setIsDeletingBrokenLinks] = useState(false);
+  const [showBrokenLinkDeleteConfirm, setShowBrokenLinkDeleteConfirm] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  const router = useRouter()
+  const router = useRouter() // Keep useRouter for general navigation, not for refresh
   const { playSong, currentSong, isPlaying } = useMusicPlayer()
 
-  const genreMap = useMemo(() => new Map(genres.map((genre) => [genre.id, genre.name])), [genres])
-
-  const filteredSongs = useMemo(() =>
-    selectedGenre === "all"
+  const genreMap = useMemo(() => {
+    if (!Array.isArray(genres)) {
+      console.warn("MusicLibrary (Client) WARN: genres is not an array in genreMap useMemo, defaulting to empty Map:", genres);
+      return new Map();
+    }
+    return new Map(genres.map((genre) => [genre.id, genre.name]));
+  }, [genres]);
+  
+  const filteredSongs = useMemo(() => {
+    if (!Array.isArray(songs)) {
+        console.warn("MusicLibrary (Client) WARN: songs is not an array in filteredSongs useMemo, defaulting to empty array:", songs);
+        return [];
+    }
+    return selectedGenre === "all"
       ? songs
-      : songs.filter((song) => song.genre_id === selectedGenre),
-    [selectedGenre, songs]
-  )
+      : songs.filter((song) => song.genre_id === selectedGenre);
+  }, [selectedGenre, songs]);
 
   const groupedByArtist = useMemo(() => {
+    if (!Array.isArray(filteredSongs)) {
+        console.warn("MusicLibrary (Client) WARN: filteredSongs is not an array in groupedByArtist useMemo, defaulting to empty object:", filteredSongs);
+        return {};
+    }
     return filteredSongs.reduce((acc, song) => {
       const artist = song.artist || "Artista Desconocido"
       if (!acc[artist]) {
@@ -140,7 +159,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       setDeleteSummaryTitle(`Resumen de Eliminación - ${artist}`); // Set dynamic title
       setDeleteSummary(result.summary); // Set the summary data
       setShowDeleteSummary(true);     // Show the summary modal
-      router.refresh(); // Refresh the library view
+      refetchSongs(); // Use refetchSongs instead of router.refresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       const displayError = errorMessage.includes("base de datos") ? errorMessage : `Error al eliminar: ${errorMessage}`;
@@ -165,7 +184,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Canción '${song.title}' eliminada correctamente.`, { id: toastId });
-      setTimeout(() => router.refresh(), 100); // Re-introduce delay for refresh
+      refetchSongs(); // Use refetchSongs instead of setTimeout(() => router.refresh(), 100)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
@@ -200,7 +219,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       setDeleteSummary(result.summary);
       setShowDeleteSummary(true);
       setDeleteDate(""); // Reset date input
-      router.refresh();
+      refetchSongs(); // Use refetchSongs instead of router.refresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
@@ -249,11 +268,61 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
       toast.success(`Se eliminaron ${result.deletedCount} archivos huérfanos.`, { id: toastId });
       setShowOrphanResult(false); // Close the results modal
       setOrphanResult(null);     // Clear the results
+      refetchSongs(); // Use refetchSongs instead of router.refresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
     } finally {
       setIsDeletingOrphans(false);
+    }
+  };
+
+  // --- Broken Link Check Logic ---
+  const handleBrokenLinkCheck = async () => {
+    setIsCheckingBrokenLinks(true);
+    const toastId = toast.loading('Buscando registros rotos en Supabase...');
+    try {
+      const response = await fetch('/api/cleanup-supabase/broken-links', {
+        method: 'GET',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error');
+      }
+      toast.dismiss(toastId);
+      setBrokenLinkResult(result);
+      setShowBrokenLinkResult(true);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error en la verificación de registros rotos: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsCheckingBrokenLinks(false);
+    }
+  };
+
+  // --- Delete Broken Links Logic ---
+  const handleDeleteBrokenLinks = async () => {
+    setIsDeletingBrokenLinks(true);
+    setShowBrokenLinkDeleteConfirm(false);
+    const toastId = toast.loading(`Eliminando ${brokenLinkResult?.brokenRecordCount || ''} registros rotos...`);
+
+    try {
+      const response = await fetch('/api/cleanup-supabase/broken-links', {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error');
+      }
+      toast.success(`Se eliminaron ${result.deletedCount} registros rotos.`, { id: toastId });
+      setShowBrokenLinkResult(false); // Close the results modal
+      setBrokenLinkResult(null);     // Clear the results
+      refetchSongs(); // Use refetchSongs instead of router.refresh()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error al eliminar registros rotos: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsDeletingBrokenLinks(false);
     }
   };
 
@@ -291,7 +360,7 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                     Eliminar por Fecha
                 </Button>
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
+            <div className="flex flex-col gap-2 pt-2">
                <p className="text-sm text-muted-foreground flex-shrink-0">Mantenimiento de Almacenamiento:</p>
                <Button
                     variant="outline"
@@ -300,6 +369,14 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                 >
                     {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Archivos Huérfanos
+                </Button>
+                 <Button
+                    variant="secondary"
+                    onClick={handleBrokenLinkCheck}
+                    disabled={isCheckingBrokenLinks || isDeletingBrokenLinks}
+                >
+                    {isCheckingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Verificar Registros Rotos
                 </Button>
             </div>
           </div>
@@ -388,8 +465,8 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
               open={isAddIndividualMusicOpen}
               onOpenChange={setAddIndividualMusicOpen}
               onUploadSuccess={() => {
-                setAddIndividualMusicOpen(false);
-                router.refresh();
+                setAddIndividualMusicOpen(false); // Call refetchSongs from context
+                refetchSongs();
               }}
               preselectedArtist={artistToAddSongTo}
             />
@@ -505,7 +582,81 @@ export default function MusicLibrary({ songs, genres }: MusicLibraryProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Broken Link Results Dialog */}
+            <AlertDialog open={showBrokenLinkResult} onOpenChange={setShowBrokenLinkResult}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Análisis de Registros Rotos Completado</AlertDialogTitle>
+                        {brokenLinkResult ? (
+                            <div className="space-y-3 text-base pt-4 text-muted-foreground text-sm">
+                                <div>Total de archivos en Cloudflare R2: <span className="font-bold">{brokenLinkResult.totalR2Files}</span></div>
+                                <div>Total de canciones en Supabase: <span className="font-bold">{brokenLinkResult.totalSupabaseSongs}</span></div>
+                                <div className="text-lg">Registros rotos encontrados: <span className="font-bold text-destructive">{brokenLinkResult.brokenRecordCount}</span></div>
+                                {brokenLinkResult.brokenRecordCount > 0 && (
+                                    <>
+                                        <p className="text-sm pt-2">
+                                            Estos registros en Supabase apuntan a archivos que ya no existen en Cloudflare R2.
+                                        </p>
+                                        <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 text-xs">
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {brokenLinkResult.brokenRecords.map((record: any) => (
+                                                    <li key={record.id} className="text-destructive/80">
+                                                        {record.artist} - {record.title} (ID: {record.id.substring(0, 8)}...)
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-muted-foreground text-sm">No se pudo obtener el resultado del análisis de registros rotos.</div>
+                        )}
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        {brokenLinkResult?.brokenRecordCount > 0 && (
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    setShowBrokenLinkResult(false);
+                                    setShowBrokenLinkDeleteConfirm(true);
+                                }}
+                                disabled={isDeletingBrokenLinks}
+                            >
+                                {isDeletingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                Limpiar Registros Rotos
+                            </Button>
+                        )}
+                        <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)}>Cerrar</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Broken Link Delete Confirmation Dialog */}
+            <AlertDialog open={showBrokenLinkDeleteConfirm} onOpenChange={setShowBrokenLinkDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción es irreversible. Se eliminarán permanentemente 
+                            **{brokenLinkResult?.brokenRecordCount}** registros de canciones de Supabase.
+                            Estos registros apuntan a archivos inexistentes en Cloudflare R2.
+                            Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteBrokenLinks}
+                            className="bg-destructive hover:bg-destructive/90"
+                            disabled={isDeletingBrokenLinks}
+                        >
+                             {isDeletingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sí, eliminar registros rotos'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
           </>
   )
 }
-
