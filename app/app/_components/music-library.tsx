@@ -476,15 +476,17 @@ export default function MusicLibrary() { // Props removed
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>{deleteSummaryTitle}</AlertDialogTitle>
-                  {deleteSummary ? (
-                    <div className="space-y-2 text-base text-muted-foreground text-sm">
-                      <div>Se encontraron **{deleteSummary.totalSongs}** canciones.</div>
-                      <div>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</div>
-                      <div>El rastro en la base de datos de Supabase fue eliminado.</div>
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground text-sm">No se pudo obtener el resumen de eliminación.</div>
-                  )}
+                  <AlertDialogDescription asChild>
+                    {deleteSummary ? (
+                      <div className="space-y-2 text-base text-muted-foreground text-sm">
+                        <div>Se encontraron **{deleteSummary.totalSongs}** canciones.</div>
+                        <div>Se eliminaron **{deleteSummary.deletedFromR2}** archivos de Cloudflare R2.</div>
+                        <div>El rastro en la base de datos de Supabase fue eliminado.</div>
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-sm">No se pudo obtener el resumen de eliminación.</div>
+                    )}
+                  </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogAction onClick={() => {
@@ -525,6 +527,7 @@ export default function MusicLibrary() { // Props removed
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Análisis de Archivos Huérfanos Completado</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
                         {orphanResult ? (
                             <div className="space-y-3 text-base pt-4 text-muted-foreground text-sm">
                                 <div>Total de archivos en Cloudflare R2: <span className="font-bold">{orphanResult.totalR2Files}</span></div>
@@ -539,6 +542,7 @@ export default function MusicLibrary() { // Props removed
                         ) : (
                             <div className="text-muted-foreground text-sm">No se pudo obtener el resultado del análisis.</div>
                         )}
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         {orphanResult?.orphanFileCount > 0 && (
@@ -588,6 +592,7 @@ export default function MusicLibrary() { // Props removed
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Análisis de Registros Rotos Completado</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
                         {brokenLinkResult ? (
                             <div className="space-y-3 text-base pt-4 text-muted-foreground text-sm">
                                 <div>Total de archivos en Cloudflare R2: <span className="font-bold">{brokenLinkResult.totalR2Files}</span></div>
@@ -613,6 +618,7 @@ export default function MusicLibrary() { // Props removed
                         ) : (
                             <div className="text-muted-foreground text-sm">No se pudo obtener el resultado del análisis de registros rotos.</div>
                         )}
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         {brokenLinkResult?.brokenRecordCount > 0 && (

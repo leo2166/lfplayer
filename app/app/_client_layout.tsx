@@ -195,7 +195,7 @@ export default function ClientLayout({
 
         {/* PWA Install Button */}
         {canInstall && (
-          <div className="fixed bottom-4 right-4 z-50">
+          <div className="fixed bottom-4 right-4 z-[60]">
             <Button
               onClick={handleInstall}
               className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white shadow-lg"

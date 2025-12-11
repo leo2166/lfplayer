@@ -39,41 +39,85 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
-  const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder'); // NEW STATE
-  const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || ""); // NEW STATE
+  const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder');
+  const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || "");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [existingFiles, setExistingFiles] = useState(0);
 
   useEffect(() => {
     if (preselectedArtist) {
       setArtistNameInput(preselectedArtist);
-      setUploadMode('files'); // Force files mode if artist pre-selected
+      setUploadMode('files');
     } else {
-      setArtistNameInput(""); // Clear artist input if no preselected artist
-      // uploadMode is not explicitly set here, it defaults to 'folder' initially
+      setArtistNameInput("");
     }
-  }, [preselectedArtist]); // Only run when preselectedArtist changes
+  }, [preselectedArtist]);
 
   useEffect(() => {
-    // Clear files if mode changes
     setFiles([]);
     setError(null);
     setUploadErrors([]);
     setSuccessCount(0);
-    // Clear input refs when mode changes to prevent accidental re-upload
+    setIsVerifying(false);
+    setTotalFiles(0);
+    setExistingFiles(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (folderInputRef.current) folderInputRef.current.value = "";
   }, [uploadMode]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Removed: setFiles([]) - This was redundant and potentially causing issues.
-    setError(null)
-    setUploadErrors([])
-    setSuccessCount(0)
-    const selectedFiles = e.target.files
-    if (selectedFiles) {
-      const audioFiles = Array.from(selectedFiles).filter((file) => file.name.toLowerCase().endsWith(".mp3"))
-      setFiles(audioFiles)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    setUploadErrors([]);
+    setSuccessCount(0);
+    setTotalFiles(0);
+    setExistingFiles(0);
+
+    const selectedFiles = e.target.files;
+    if (!selectedFiles) return;
+
+    const audioFiles = Array.from(selectedFiles).filter((file) => file.name.toLowerCase().endsWith(".mp3"));
+    setTotalFiles(audioFiles.length);
+
+    if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
+      const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
+      if (artistName) {
+        setIsVerifying(true);
+        setArtistNameInput(artistName);
+        try {
+          const res = await fetch(`/api/artists/${encodeURIComponent(artistName)}/songs`);
+          if (!res.ok) {
+            // If artist not found (404) or other error, treat all files as new
+            console.warn(`Could not fetch existing songs for ${artistName}. Assuming all files are new.`);
+            setFiles(audioFiles);
+            setExistingFiles(0);
+          } else {
+            const { titles: existingTitles } = await res.json();
+            const existingTitleSet = new Set(existingTitles.map((t: string) => t.toLowerCase()));
+            
+            const newFiles = audioFiles.filter(file => {
+              const fileTitle = file.name.replace(/\.mp3$/i, "").toLowerCase();
+              return !existingTitleSet.has(fileTitle);
+            });
+            
+            setFiles(newFiles);
+            setExistingFiles(audioFiles.length - newFiles.length);
+          }
+        } catch (error) {
+          console.error("Error verifying files:", error);
+          setError("Error al verificar archivos existentes. Se subirán todos los archivos.");
+          setFiles(audioFiles); // Fallback to uploading all files
+        } finally {
+          setIsVerifying(false);
+        }
+      } else {
+         // Fallback if artist name can't be determined
+        setFiles(audioFiles);
+      }
+    } else {
+      setFiles(audioFiles);
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -328,12 +372,22 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 </Button>
             )}
           </div>
-          {files.length > 0 && (
-            <p className="text-sm text-muted-foreground mt-2">
+          {isVerifying && (
+            <p className="text-sm text-muted-foreground mt-2">Verificando archivos existentes...</p>
+          )}
+          {!isVerifying && totalFiles > 0 && uploadMode === 'folder' && (
+            <div className="text-sm text-muted-foreground mt-2 space-y-1">
+              <p>Carpeta <span className="font-semibold">{artistNameInput}</span> seleccionada.</p>
+              <p>{totalFiles} archivos encontrados. {existingFiles} ya existen en la librería.</p>
+              <p className="font-bold text-purple-600">{files.length} nuevas canciones para subir.</p>
+            </div>
+          )}
+           {!isVerifying && totalFiles > 0 && uploadMode === 'files' && (
+             <p className="text-sm text-muted-foreground mt-2">
               {files.length} {files.length === 1 ? "archivo seleccionado" : "archivos seleccionados"} (
               {(files.reduce((acc, file) => acc + file.size, 0) / 1024 / 1024).toFixed(2)} MB)
             </p>
-          )}
+           )}
         </div>
 
         {isLoading && (
@@ -369,10 +423,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         <Button
           type="submit"
-          disabled={isLoading || files.length === 0}
+          disabled={isLoading || isVerifying || files.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Subiendo...` : `Subir ${files.length} canciones`}
+          {isLoading ? `Subiendo...` : isVerifying ? 'Verificando...' : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
       </form>
     </div>
