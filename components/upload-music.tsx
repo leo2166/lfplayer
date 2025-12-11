@@ -194,27 +194,63 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
       const songsData = await Promise.all(songsDataPromises)
       setUploadProgress(85)
-      console.log("Paso 5: Metadatos obtenidos. Guardando en la base de datos...");
-      
-      const saveRes = await fetch("/api/songs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(songsData),
-      })
-      console.log("Paso 6: La petición a /api/songs ha finalizado.");
+      console.log("Paso 5: Metadatos obtenidos. Guardando en la base de datos en lotes...");
 
-      if (!saveRes.ok) {
-        const errorData = await saveRes.json().catch(() => ({}));
-        console.error("Error al guardar en la base de datos (respuesta completa):", errorData);
-        throw new Error(errorData.error || "Error al guardar las canciones en la base de datos");
+      const DB_CHUNK_SIZE = 15;
+      let allSavedSongs = [];
+
+      for (let i = 0; i < songsData.length; i += DB_CHUNK_SIZE) {
+        const chunk = songsData.slice(i, i + DB_CHUNK_SIZE);
+        const chunkNumber = Math.floor(i / DB_CHUNK_SIZE) + 1;
+        const totalChunks = Math.ceil(songsData.length / DB_CHUNK_SIZE);
+
+        console.log(`  - Enviando lote ${chunkNumber} de ${totalChunks} a /api/songs...`);
+        try {
+          const saveRes = await fetch("/api/songs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(chunk),
+          });
+
+          if (!saveRes.ok) {
+            const errorData = await saveRes.json().catch(() => ({}));
+            console.error(`Error al guardar el lote ${chunkNumber}:`, errorData.error || 'Error desconocido del servidor');
+            // Don't throw, just log. Verification step will handle this.
+            chunk.forEach(failedSong => {
+              allFailedUploads.push({
+                fileName: `${failedSong.artist} - ${failedSong.title}`,
+                reason: `El lote no se pudo guardar en la base de datos (Error ${saveRes.status})`
+              });
+            });
+
+          } else {
+            const savedSongsChunk = await saveRes.json();
+            allSavedSongs.push(...savedSongsChunk.songs);
+          }
+        } catch (chunkError) {
+           console.error(`Error de red al guardar el lote ${chunkNumber}:`, chunkError);
+           chunk.forEach(failedSong => {
+              allFailedUploads.push({
+                fileName: `${failedSong.artist} - ${failedSong.title}`,
+                reason: `Error de red al intentar guardar en la base de datos.`
+              });
+            });
+        }
+        
+        // Update progress after each DB chunk
+        const dbProgress = ((i + chunk.length) / songsData.length) * 15; // This part of progress is from 85 to 100
+        setUploadProgress(85 + dbProgress);
       }
-
-      const savedSongs = await saveRes.json()
-      setUploadProgress(100)
-      console.log("Paso 7: Datos guardados exitosamente en la base de datos.");
       
-      onUploadSuccess?.(savedSongs.songs)
-      setSuccessCount(savedSongs.songs.length);
+      console.log("Paso 6: Todas las peticiones a /api/songs han finalizado.");
+      setUploadErrors(allFailedUploads); // Update errors with any DB failures
+
+      if (allSavedSongs.length === 0 && allSuccessfulUploads.length > 0) {
+        throw new Error("Las canciones se subieron pero ninguna pudo ser guardada en la base de datos.")
+      }
+      
+      onUploadSuccess?.(allSavedSongs)
+      setSuccessCount(allSavedSongs.length);
 
       // Reset form
       setFiles([])
