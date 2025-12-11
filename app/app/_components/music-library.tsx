@@ -136,10 +136,6 @@ export default function MusicLibrary() { // Props removed
     )
   }
 
-  const handlePlay = (song: Song) => {
-    playSong(song, filteredSongs)
-  }
-
   // --- Artist Deletion Logic ---
   const handleDeleteArtist = async (artist: string) => {
     if (deletingArtist === artist) return; // Prevent multiple deletions
@@ -442,7 +438,7 @@ export default function MusicLibrary() { // Props removed
                       artist={song.artist}
                       duration={song.duration || 0}
                       genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
-                      onPlay={() => handlePlay(song, artistSongs)}
+                      onPlay={() => playSong(song, artistSongs)}
                       onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
                       isDeleting={deletingSong?.id === song.id}
                       isPlaying={isPlaying && currentSong?.id === song.id}
