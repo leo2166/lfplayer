@@ -19,7 +19,6 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   const userRole = useUserRole()
-  const setRole = useSetUserRole()
   const pathname = usePathname()
   const router = useRouter()
   const { closePlayer } = useMusicPlayer()
@@ -34,29 +33,18 @@ export default function ClientLayout({
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        // Fetch user profile to get role
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single()
-        
-        setRole((profile?.role as any) || 'user')
-        console.log("Auth state changed: SIGNED_IN, role set to", profile?.role)
-      } else if (event === "SIGNED_OUT") {
-        setRole("guest")
-        console.log("Auth state changed: SIGNED_OUT, role set to guest")
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        // Refresh the page to let the server re-evaluate the user role
+        router.refresh();
       }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase, setRole])
+  }, [supabase, router])
   
-
   const navItems = [
     {
       label: "Mi Música",
@@ -72,7 +60,10 @@ export default function ClientLayout({
 
   const handleUploadSuccess = () => {
     setAddMusicOpen(false)
-    router.refresh()
+    // Add a small delay to give Next.js cache more time to revalidate
+    setTimeout(() => {
+      router.refresh() 
+    }, 100); 
   }
 
   const handleSignOut = async () => {
