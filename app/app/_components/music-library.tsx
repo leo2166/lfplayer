@@ -357,23 +357,27 @@ export default function MusicLibrary() { // Props removed
                 </Button>
             </div>
             <div className="flex flex-col gap-2 pt-2">
-               <p className="text-sm text-muted-foreground flex-shrink-0">Mantenimiento de Almacenamiento:</p>
-               <Button
+              <div className="border border-border p-3 rounded-lg">
+                <p className="text-sm text-muted-foreground flex-shrink-0 mb-3">Mantenimiento de Almacenamiento:</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
                     variant="outline"
                     onClick={handleOrphanCheck}
                     disabled={isCheckingOrphans || isDeletingOrphans}
-                >
+                  >
                     {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Archivos Huérfanos
-                </Button>
-                 <Button
-                    variant="secondary"
+                  </Button>
+                  <Button
+                    variant="outline" // Changed from secondary to outline
                     onClick={handleBrokenLinkCheck}
                     disabled={isCheckingBrokenLinks || isDeletingBrokenLinks}
-                >
+                  >
                     {isCheckingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Registros Rotos
-                </Button>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
