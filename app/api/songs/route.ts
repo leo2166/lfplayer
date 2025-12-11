@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { revalidatePath } from 'next/cache'; // Añadir esta línea
+import { revalidatePath } from 'next/cache';
 import { type NextRequest, NextResponse } from "next/server"
 import { r2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/cloudflare/r2"
 import { DeleteObjectCommand } from "@aws-sdk/client-s3"
@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log(`\n--- POST /api/songs endpoint hit at: ${new Date().toISOString()} ---`);
     const supabase = await createClient()
     const {
       data: { user },
@@ -72,13 +73,11 @@ export async function POST(request: NextRequest) {
     let songsToInsert: any[]
 
     if (Array.isArray(body)) {
-      // Batch insert
       songsToInsert = body.map((song) => ({
         ...song,
         user_id: user.id,
       }))
     } else {
-      // Single insert
       const { title, artist, genre_id, blob_url, duration } = body
       songsToInsert = [
         {
@@ -92,19 +91,31 @@ export async function POST(request: NextRequest) {
       ]
     }
 
-    if (error) throw error
-
-    console.log("Canciones insertadas en Supabase:", data); // Log the inserted data
-    revalidatePath('/app'); // Invalidate cache for the music library page
-    return NextResponse.json({ songs: data })
-  } catch (error) {
-    console.error("Error creating song(s):", error);
-    let errorMessage = "An unknown error occurred";
-    if (typeof error === 'object' && error !== null && 'message' in error) {
-      errorMessage = (error as { message: string }).message;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
+    if (songsToInsert.length === 0) {
+        return NextResponse.json({ error: "No songs to insert" }, { status: 400 });
     }
+
+    const { data, error } = await supabase.from("songs").insert(songsToInsert).select()
+
+    if (error) {
+      throw error;
+    }
+    
+    console.log("Canciones insertadas en Supabase:", data);
+    revalidatePath('/app');
+    return NextResponse.json({ songs: data })
+
+  } catch (err) {
+    let errorMessage = "An unknown error occurred.";
+    if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = (err as { message: string }).message;
+    } else if (err instanceof Error) {
+        errorMessage = err.message;
+    } else if (typeof err === 'string') {
+        errorMessage = err;
+    }
+
+    console.error("Error creating song(s):", errorMessage);
     return NextResponse.json({ error: `Failed to create song(s): ${errorMessage}` }, { status: 500 });
   }
 }
@@ -132,11 +143,10 @@ export async function DELETE(request: NextRequest) {
 
     const { id, blob_url } = await request.json()
 
-    // Delete from R2
     if (blob_url) {
       try {
         const url = new URL(blob_url)
-        const objectKey = url.pathname.substring(1) // Remove leading slash
+        const objectKey = url.pathname.substring(1)
         
         const deleteCommand = new DeleteObjectCommand({
             Bucket: CLOUDFLARE_R2_BUCKET_NAME,
@@ -147,16 +157,14 @@ export async function DELETE(request: NextRequest) {
         console.log(`Successfully deleted object from R2: ${objectKey}`);
       } catch (r2Error) {
         console.error("Error deleting from R2:", r2Error);
-        // Continue with database deletion
       }
     }
 
-    // Delete from database
     const { error } = await supabase.from("songs").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) throw error
 
-    revalidatePath('/app'); // Invalidate cache for the music library page
+    revalidatePath('/app');
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting song:", error)
