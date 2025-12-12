@@ -206,10 +206,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
             </div>
         ) : (
-           uploadMode === 'folder' && 
-           <div>
-               <Label htmlFor="artistName">Artista (extraído de la carpeta)</Label>
-               <Input id="artistName" value={artistNameInput} onChange={(e) => setArtistNameInput(e.target.value)} className="mt-1" disabled={isLoading} />
+           uploadMode === 'folder' && artistNameInput && 
+           <div className="space-y-1">
+               <Label>Carpeta a subir (artista):</Label>
+               <p className="font-bold text-green-600 text-lg">{artistNameInput}</p>
            </div>
         )}
 
