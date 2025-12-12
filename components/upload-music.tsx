@@ -39,6 +39,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const [error, setError] = useState<string | null>(null)
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
 
+  // DEBUG LOG:
+  console.log('DEBUG RENDER: files.length =', files.length, 'isLoading =', isLoading, 'Calculated disabled =', isLoading || files.length === 0);
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
