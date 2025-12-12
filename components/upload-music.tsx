@@ -237,11 +237,11 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {uploadMode === 'files' ? (
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                     Seleccionar Archivos
                 </Button>
             ) : (
-                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()} disabled={isLoading}>
+                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()}>
                     Seleccionar Carpeta
                 </Button>
             )}
