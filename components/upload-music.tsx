@@ -91,42 +91,11 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     );
     setNonMP3SkippedCount(selectedFiles.length - audioFiles.length);
     
-    if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
-      const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
-      if (artistName) {
-        setIsVerifying(true);
-        setArtistNameInput(artistName);
-        try {
-          const res = await fetch(`/api/artists/${encodeURIComponent(artistName)}/songs`);
-          if (!res.ok) {
-            console.warn(`Could not fetch existing songs for ${artistName}. Assuming all files are new.`);
-            setFiles(audioFiles);
-            setExistingFiles(0);
-          } else {
-            const { titles: existingTitles } = await res.json();
-            const existingTitleSet = new Set(existingTitles.map((t: string) => t.toLowerCase()));
-            
-            const newFiles = audioFiles.filter(file => {
-              const fileTitle = file.name.replace(/\.mp3$/i, "").toLowerCase();
-              return !existingTitleSet.has(fileTitle);
-            });
-            
-            setFiles(newFiles);
-            setExistingFiles(audioFiles.length - newFiles.length);
-          }
-        } catch (error) {
-          console.error("Error verifying files:", error);
-          setError("Error al verificar archivos existentes. Se subirán todos los archivos.");
-          setFiles(audioFiles);
-        } finally {
-          setIsVerifying(false);
-        }
-      } else {
-        setFiles(audioFiles);
-      }
-    } else {
-      setFiles(audioFiles);
-    }
+    // Temporarily disable pre-verification of existing files to unblock upload
+    // All valid MP3s found will be set to files for processing.
+    setFiles(audioFiles);
+    setExistingFiles(0); // No longer checking for existing files in this step
+    setIsVerifying(false); // Ensure verification state is off
   };
 
   const updateStatus = (fileName: string, status: UploadStatus['status'], message: string, color: UploadStatus['color']) => {
@@ -295,9 +264,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
                 <p>Se encontraron <span className="font-bold">{totalSelectedFiles}</span> archivos en total.</p>
                 {nonMP3SkippedCount > 0 && <p className="text-amber-600">Se omitieron <span className="font-bold">{nonMP3SkippedCount}</span> archivos por no ser MP3.</p>}
-                <p> <span className="font-bold text-primary">{files.length + existingFiles}</span> archivos MP3 encontrados.</p>
-                {uploadMode === 'folder' && existingFiles > 0 && <p className="text-blue-600">{existingFiles} ya existen en la librería para el artista <span className="font-semibold">{artistNameInput}</span> y serán omitidos.</p>}
-                <p className="font-bold text-purple-600">{files.length} nuevas canciones para procesar.</p>
+                <p className="font-bold text-purple-600">{files.length} canciones MP3 aptas para procesar.</p>
             </div>
            )}
         </div>
