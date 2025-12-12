@@ -67,23 +67,32 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   }, [uploadMode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    resetState();
-    const selectedFiles = e.target.files;
-    if (!selectedFiles) {
-      setFiles([]);
-      return;
-    }
+    // First, capture the files from the event.
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    
+    // Manually reset UI states from previous uploads without clearing the input field yet.
+    setError(null);
+    setUploadStatuses([]);
 
-    // NO MP3 FILTER - take all selected files directly
-    setFiles(Array.from(selectedFiles));
+    // Now, update the component's state with the new files.
+    setFiles(selectedFiles);
 
-    // If folder upload, automatically extract artist name
-    if (uploadMode === 'folder' && selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
-      const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
-      if (artistName) {
-        setArtistNameInput(artistName);
-      }
+    // If folder upload, automatically extract artist name from the relative path.
+    if (uploadMode === 'folder') {
+        if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
+            const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
+            if (artistName) {
+                setArtistNameInput(artistName);
+            }
+        } else {
+             // If no files are selected (e.g., user cancels), reset artist name
+            setArtistNameInput(preselectedArtist || "");
+        }
     }
+    
+    // It's important to clear the input value to allow selecting the same file(s) again.
+    // The event target is the specific input that was used.
+    e.target.value = '';
   };
 
   const updateStatus = (fileName: string, status: UploadStatus['status'], message: string, color: UploadStatus['color']) => {
