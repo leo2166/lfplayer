@@ -37,8 +37,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const [isLoading, setIsLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  
-  // New state for live diagnostic log
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -46,14 +44,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
   const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder');
   const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || "");
-  const [isVerifying, setIsVerifying] = useState(false);
-
-  // New states for initial validation
-  const [totalSelectedFiles, setTotalSelectedFiles] = useState(0);
-  const [nonMP3SkippedCount, setNonMP3SkippedCount] = useState(0);
-  const [existingFiles, setExistingFiles] = useState(0);
-
-
+  
   useEffect(() => {
     if (preselectedArtist) {
       setArtistNameInput(preselectedArtist);
@@ -67,10 +58,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       setFiles([]);
       setError(null);
       setUploadStatuses([]);
-      setIsVerifying(false);
-      setTotalSelectedFiles(0);
-      setNonMP3SkippedCount(0);
-      setExistingFiles(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (folderInputRef.current) folderInputRef.current.value = "";
   }
@@ -79,23 +66,26 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     resetState();
   }, [uploadMode]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     resetState();
     const selectedFiles = e.target.files;
-    if (!selectedFiles) return;
-
-    setTotalSelectedFiles(selectedFiles.length);
+    if (!selectedFiles) {
+      setFiles([]);
+      return;
+    }
 
     const audioFiles = Array.from(selectedFiles).filter((file) => 
         file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith(".mp3")
     );
-    setNonMP3SkippedCount(selectedFiles.length - audioFiles.length);
-    
-    // Temporarily disable pre-verification of existing files to unblock upload
-    // All valid MP3s found will be set to files for processing.
     setFiles(audioFiles);
-    setExistingFiles(0); // No longer checking for existing files in this step
-    setIsVerifying(false); // Ensure verification state is off
+
+    // If folder upload, automatically extract artist name
+    if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
+      const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
+      if (artistName) {
+        setArtistNameInput(artistName);
+      }
+    }
   };
 
   const updateStatus = (fileName: string, status: UploadStatus['status'], message: string, color: UploadStatus['color']) => {
@@ -118,8 +108,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       setError("Por favor selecciona archivos de audio y un género.");
       return;
     }
-    if (uploadMode === 'files' && !artistNameInput.trim()) {
-      setError("Por favor ingresa el nombre del artista.");
+    if (!artistNameInput.trim()) {
+      setError("Por favor ingresa o selecciona un nombre de artista.");
       return;
     }
 
@@ -154,16 +144,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             audio.onerror = () => { console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); }
           });
 
-          let songArtistName = artistNameInput.trim();
-          if (uploadMode === 'folder' && !songArtistName && file.webkitRelativePath) {
-              songArtistName = file.webkitRelativePath.split("/")[0] || "Varios Artistas";
-          } else if (!songArtistName) {
-              songArtistName = "Varios Artistas";
-          }
-          
           const songData = {
             title: currentFileName.replace(/\.mp3$/i, ""),
-            artist: songArtistName,
+            artist: artistNameInput.trim(),
             genre_id,
             blob_url: downloadUrl,
             duration,
@@ -202,11 +185,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
     } finally {
       setIsLoading(false);
-      // Don't reset immediately, let the user see the results.
       setTimeout(() => {
         resetState();
         setUploadProgress(0);
-      }, 30000); // 30 seconds to review the log
+      }, 30000); 
     }
   }
 
@@ -218,11 +200,17 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {preselectedArtist && (
+        {preselectedArtist ? (
             <div>
                 <Label htmlFor="artistName">Añadir canciones a</Label>
                 <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
             </div>
+        ) : (
+           uploadMode === 'folder' && 
+           <div>
+               <Label htmlFor="artistName">Artista (extraído de la carpeta)</Label>
+               <Input id="artistName" value={artistNameInput} onChange={(e) => setArtistNameInput(e.target.value)} className="mt-1" disabled={isLoading} />
+           </div>
         )}
 
         <div>
@@ -258,12 +246,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 </Button>
             )}
           </div>
-          {isVerifying && <p className="text-sm text-muted-foreground mt-2">Verificando archivos existentes...</p>}
           
-          {!isVerifying && totalSelectedFiles > 0 && (
+          {files.length > 0 && (
             <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
-                <p>Se encontraron <span className="font-bold">{totalSelectedFiles}</span> archivos en total.</p>
-                {nonMP3SkippedCount > 0 && <p className="text-amber-600">Se omitieron <span className="font-bold">{nonMP3SkippedCount}</span> archivos por no ser MP3.</p>}
                 <p className="font-bold text-purple-600">{files.length} canciones MP3 aptas para procesar.</p>
             </div>
            )}
@@ -322,10 +307,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         <Button
           type="submit"
-          disabled={isLoading || isVerifying || files.length === 0}
+          disabled={isLoading || files.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Procesando...` : isVerifying ? 'Verificando...' : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
+          {isLoading ? `Procesando...` : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
       </form>
     </div>
