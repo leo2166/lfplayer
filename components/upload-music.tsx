@@ -39,9 +39,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const [error, setError] = useState<string | null>(null)
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
 
-  // DEBUG LOG:
-  console.log('DEBUG RENDER: files.length =', files.length, 'isLoading =', isLoading, 'Calculated disabled =', isLoading || files.length === 0);
-
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -70,39 +67,24 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   }, [uploadMode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('DEBUG handleFileChange: Function called.');
     resetState();
-    console.log('DEBUG handleFileChange: After resetState (sync), files state would be empty.');
-    
     const selectedFiles = e.target.files;
-    console.log('DEBUG handleFileChange: e.target.files (selectedFiles) =', selectedFiles);
-    console.log('DEBUG handleFileChange: selectedFiles.length =', selectedFiles ? selectedFiles.length : 'null');
-    
     if (!selectedFiles) {
       setFiles([]);
-      console.log('DEBUG handleFileChange: No selected files detected, set files to [] and returning.');
       return;
     }
 
     const audioFiles = Array.from(selectedFiles).filter((file) => 
         file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith(".mp3")
     );
-    console.log('DEBUG handleFileChange: After filtering, audioFiles.length =', audioFiles.length);
-    console.log('DEBUG handleFileChange: After filtering, audioFiles content =', audioFiles);
-    
     setFiles(audioFiles);
-    // Note: files.length here might not reflect the updated state immediately due to async nature of setFiles
-    console.log('DEBUG handleFileChange: setFiles(audioFiles) called with audioFiles.length =', audioFiles.length);
 
     // If folder upload, automatically extract artist name
     if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
       const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
       if (artistName) {
         setArtistNameInput(artistName);
-        console.log('DEBUG handleFileChange: Artist name extracted and set:', artistName);
       }
-    } else if (uploadMode === 'folder' && audioFiles.length === 0) {
-        console.log('DEBUG handleFileChange: Folder mode, but no audio files found to extract artist name.');
     }
   };
 
