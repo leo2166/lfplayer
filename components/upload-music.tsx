@@ -74,14 +74,12 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       return;
     }
 
-    const audioFiles = Array.from(selectedFiles).filter((file) => 
-        file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith(".mp3")
-    );
-    setFiles(audioFiles);
+    // NO MP3 FILTER - take all selected files directly
+    setFiles(Array.from(selectedFiles));
 
     // If folder upload, automatically extract artist name
-    if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
-      const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
+    if (uploadMode === 'folder' && selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
+      const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
       if (artistName) {
         setArtistNameInput(artistName);
       }
@@ -104,14 +102,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     setError(null);
     setUploadProgress(0);
 
-    if (files.length === 0 || !genre_id) {
-      setError("Por favor selecciona archivos de audio y un género.");
-      return;
-    }
-    if (!artistNameInput.trim()) {
-      setError("Por favor ingresa o selecciona un nombre de artista.");
-      return;
-    }
+    // NO VALIDATION HERE - just proceed with the current state
+    // The following checks are removed as per user's "cero validaciones" directive
+    // if (files.length === 0 || !genre_id) { setError("..."); return; }
+    // if (!artistNameInput.trim()) { setError("..."); return; }
 
     setIsLoading(true);
     setUploadStatuses(files.map(f => ({ fileName: f.name, status: 'Pendiente', message: 'En espera para procesar', color: 'text-muted-foreground' })));
@@ -125,6 +119,19 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         const currentFileName = file.name;
         
         try {
+          // Additional check for MP3 validity during processing, as no pre-filter
+          if (!file.name.toLowerCase().endsWith(".mp3")) {
+            throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
+          }
+          // Additional check for genre_id and artistNameInput
+          if (!genre_id) {
+            throw new Error("Género no seleccionado.");
+          }
+          if (!artistNameInput.trim()) {
+            throw new Error("Artista no especificado.");
+          }
+
+
           updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1 de 3: Subiendo archivo...', 'text-purple-600');
           const presignResponse = await fetch("/api/upload", {
             method: "POST",
@@ -144,10 +151,11 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             audio.onerror = () => { console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); }
           });
 
+          // Allow empty artistNameInput and genre_id, as per "cero validaciones"
           const songData = {
             title: currentFileName.replace(/\.mp3$/i, ""),
-            artist: artistNameInput.trim(),
-            genre_id,
+            artist: artistNameInput.trim(), // Use as is, will be checked by explicit validation above
+            genre_id: genre_id, // Use as is, will be checked by explicit validation above
             blob_url: downloadUrl,
             duration,
           };
@@ -172,7 +180,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           console.error(`Fallo el proceso para ${currentFileName}:`, reason);
           updateStatus(currentFileName, 'Error', reason, 'text-red-600');
         } finally {
-          const progress = (processedFileCount / files.length) * 100;
+          // Handle case where files.length might be 0 if the original selection was empty
+          const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
           setUploadProgress(progress);
         }
       }
@@ -182,7 +191,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
     } catch (err) {
       console.error("Error inesperado en el proceso de subida:", err);
-      setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
+      // Removed the general error message as per "cero validaciones", now specific in-loop errors handle it.
+      // setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
     } finally {
       setIsLoading(false);
       setTimeout(() => {
@@ -249,7 +259,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           
           {files.length > 0 && (
             <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
-                <p className="font-bold text-purple-600">{files.length} canciones MP3 aptas para procesar.</p>
+                <p className="font-bold text-purple-600">{files.length} archivos seleccionados.</p>
             </div>
            )}
         </div>
@@ -264,7 +274,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         {isLoading && (
           <div className="space-y-3 pt-2">
             <div className="space-y-2">
-                <Label>Procesando {files.length} {files.length === 1 ? "canción" : "canciones"}...</Label>
+                <Label>Procesando {files.length} {files.length === 1 ? 'archivo' : 'archivos'}...</Label>
                 <Progress value={uploadProgress} className="w-full" />
                 <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
             </div>
@@ -293,12 +303,12 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             <h4 className="font-semibold">Resumen de la Subida</h4>
              <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
                 <FileCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <p>{uploadStatuses.filter(s => s.status === 'Éxito').length} canciones procesadas exitosamente.</p>
+                <p>{uploadStatuses.filter(s => s.status === 'Éxito').length} archivos procesados exitosamente.</p>
              </div>
              {uploadStatuses.some(s => s.status === 'Error') && (
                 <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm dark:bg-red-950 dark:text-red-200">
                     <FileX className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <p>{uploadStatuses.filter(s => s.status === 'Error').length} canciones fallaron.</p>
+                    <p>{uploadStatuses.filter(s => s.status === 'Error').length} archivos fallaron.</p>
                 </div>
              )}
              <p className="text-xs text-muted-foreground">El formulario se reiniciará en 30 segundos.</p>
@@ -307,10 +317,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         <Button
           type="submit"
-          disabled={isLoading || files.length === 0}
+          disabled={isLoading} // Only disabled when loading, always clickable otherwise
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Procesando...` : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
+          {isLoading ? `Procesando...` : `Subir ${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`}
         </Button>
       </form>
     </div>
