@@ -138,181 +138,116 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     setIsLoading(true)
     setUploadProgress(0)
 
-    const CHUNK_SIZE = 5; // Process 5 files at a time
-    const allSuccessfulUploads: { downloadUrl: string, originalFile: File }[] = [];
+    const allSavedSongs: any[] = [];
     const allFailedUploads: UploadError[] = [];
 
     try {
-      console.log("Paso 1: Iniciando el proceso de subida...");
-      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-          const chunk = files.slice(i, i + CHUNK_SIZE);
-          const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
-          const totalChunks = Math.ceil(files.length / CHUNK_SIZE);
-
-          console.log(`Paso 2: Procesando chunk ${chunkNumber} de ${totalChunks}...`);
-
-          const uploadPromises = chunk.map(async (file) => {
-              try {
-                  console.log(`  - Obteniendo URL prefirmada para ${file.name}`);
-                  const presignResponse = await fetch("/api/upload", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ filename: file.name, contentType: file.type }),
-                  });
-
-                  if (!presignResponse.ok) {
-                      throw new Error(`No se pudo obtener la URL de subida para ${file.name}`);
-                  }
-                  const { url, downloadUrl } = await presignResponse.json();
-
-                  console.log(`  - Subiendo ${file.name} a R2...`);
-                  const uploadResponse = await fetch(url, {
-                      method: "PUT",
-                      body: file,
-                      headers: { "Content-Type": file.type },
-                  });
-
-                  if (!uploadResponse.ok) {
-                      throw new Error(`Error al subir ${file.name} a R2`);
-                  }
-                  
-                  console.log(`  - Subida de ${file.name} completada.`);
-                  return { downloadUrl, originalFile: file };
-              } catch (error) {
-                  throw new Error(error instanceof Error ? error.message : String(error));
-              }
-          });
-
-          const chunkResults = await Promise.allSettled(uploadPromises);
-
-          chunkResults.forEach((result, index) => {
-              const originalFile = chunk[index];
-              if (result.status === 'fulfilled') {
-                  allSuccessfulUploads.push(result.value);
-              } else {
-                  allFailedUploads.push({
-                      fileName: originalFile.name,
-                      reason: result.reason.message,
-                  });
-              }
-          });
-
-          const processedFiles = i + chunk.length;
-          setUploadProgress((processedFiles / files.length) * 70);
-      }
-
-      console.log("Paso 3: Todas las subidas a R2 completadas.");
-      setUploadErrors(allFailedUploads);
-
-      if (allSuccessfulUploads.length === 0) {
-        throw new Error("Ninguna canción pudo ser subida.")
-      }
-
-      console.log("Paso 4: Iniciando obtención de metadatos (duración) para canciones subidas...");
-      const songsDataPromises = allSuccessfulUploads.map(async ({ downloadUrl, originalFile }) => {
-        const audio = new Audio(downloadUrl)
-        const duration = await new Promise<number>((resolve) => {
-          audio.onloadedmetadata = () => resolve(Math.floor(audio.duration))
-          audio.onerror = () => {
-            console.warn(`Could not load metadata for ${downloadUrl}. Duration will be 0.`)
-            resolve(0)
-          }
-        })
-
-        let songArtistName = artistNameInput.trim();
-        if (uploadMode === 'folder' && !songArtistName && originalFile.webkitRelativePath) {
-            songArtistName = originalFile.webkitRelativePath.split("/")[0];
-        }
-        if (!songArtistName) {
-            songArtistName = "Varios Artistas";
-        }
-
-        return {
-          title: originalFile.name.replace(/\.mp3$/i, ""),
-          artist: songArtistName,
-          genre_id,
-          blob_url: downloadUrl,
-          duration,
-        }
-      })
-
-      const songsData = await Promise.all(songsDataPromises)
-      setUploadProgress(85)
-      console.log("Paso 5: Metadatos obtenidos. Guardando en la base de datos en lotes...");
-
-      const DB_CHUNK_SIZE = 15;
-      let allSavedSongs = [];
-
-      for (let i = 0; i < songsData.length; i += DB_CHUNK_SIZE) {
-        const chunk = songsData.slice(i, i + DB_CHUNK_SIZE);
-        const chunkNumber = Math.floor(i / DB_CHUNK_SIZE) + 1;
-        const totalChunks = Math.ceil(songsData.length / DB_CHUNK_SIZE);
-
-        console.log(`  - Enviando lote ${chunkNumber} de ${totalChunks} a /api/songs...`);
+      let processedFileCount = 0;
+      for (const file of files) {
+        processedFileCount++;
+        
         try {
+          console.log(`Procesando archivo ${processedFileCount} de ${files.length}: ${file.name}`);
+
+          // Step 1: Get presigned URL
+          const presignResponse = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename: file.name, contentType: file.type }),
+          });
+
+          if (!presignResponse.ok) {
+            throw new Error(`No se pudo obtener la URL de subida.`);
+          }
+          const { url, downloadUrl } = await presignResponse.json();
+
+          // Step 2: Upload to R2
+          const uploadResponse = await fetch(url, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Error al subir archivo a R2.`);
+          }
+
+          // Step 3: Get duration
+          const audio = new Audio(downloadUrl);
+          const duration = await new Promise<number>((resolve) => {
+            audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
+            audio.onerror = () => {
+              console.warn(`No se pudo cargar metadatos para ${downloadUrl}. Duración será 0.`);
+              resolve(0);
+            }
+          });
+
+          let songArtistName = artistNameInput.trim();
+          if (uploadMode === 'folder' && !songArtistName && file.webkitRelativePath) {
+              songArtistName = file.webkitRelativePath.split("/")[0];
+          }
+          if (!songArtistName) {
+              songArtistName = "Varios Artistas";
+          }
+          
+          const songData = {
+            title: file.name.replace(/\.mp3$/i, ""),
+            artist: songArtistName,
+            genre_id,
+            blob_url: downloadUrl,
+            duration,
+          };
+
+          // Step 4: Save to Supabase
           const saveRes = await fetch("/api/songs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(chunk),
+            body: JSON.stringify(songData),
           });
 
           if (!saveRes.ok) {
             const errorData = await saveRes.json().catch(() => ({}));
-            console.error(`Error al guardar el lote ${chunkNumber}:`, errorData.error || 'Error desconocido del servidor');
-            // Don't throw, just log. Verification step will handle this.
-            chunk.forEach(failedSong => {
-              allFailedUploads.push({
-                fileName: `${failedSong.artist} - ${failedSong.title}`,
-                reason: `El lote no se pudo guardar en la base de datos (Error ${saveRes.status})`
-              });
-            });
-
-          } else {
-            const savedSongsChunk = await saveRes.json();
-            allSavedSongs.push(...savedSongsChunk.songs);
+            throw new Error(errorData.error || 'Error del servidor al guardar en DB.');
           }
-        } catch (chunkError) {
-           console.error(`Error de red al guardar el lote ${chunkNumber}:`, chunkError);
-           chunk.forEach(failedSong => {
-              allFailedUploads.push({
-                fileName: `${failedSong.artist} - ${failedSong.title}`,
-                reason: `Error de red al intentar guardar en la base de datos.`
-              });
-            });
+
+          const savedSong = await saveRes.json();
+          allSavedSongs.push(savedSong.songs[0]);
+          setSuccessCount(prev => prev + 1);
+
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
+          console.error(`Fallo el proceso para ${file.name}:`, reason);
+          allFailedUploads.push({ fileName: file.name, reason });
+          setUploadErrors(prev => [...prev, { fileName: file.name, reason }]);
+        } finally {
+          // Update progress after each file is processed (success or fail)
+          const progress = (processedFileCount / files.length) * 100;
+          setUploadProgress(progress);
         }
-        
-        // Update progress after each DB chunk
-        const dbProgress = ((i + chunk.length) / songsData.length) * 15; // This part of progress is from 85 to 100
-        setUploadProgress(85 + dbProgress);
       }
-      
-      console.log("Paso 6: Todas las peticiones a /api/songs han finalizado.");
-      setUploadErrors(allFailedUploads); // Update errors with any DB failures
 
-      if (allSavedSongs.length === 0 && allSuccessfulUploads.length > 0) {
-        throw new Error("Las canciones se subieron pero ninguna pudo ser guardada en la base de datos.")
-      }
-      
-      onUploadSuccess?.(allSavedSongs)
-      setSuccessCount(allSavedSongs.length);
+      console.log("Proceso de subida finalizado.");
+      onUploadSuccess?.(allSavedSongs);
 
-      // Reset form
-      setFiles([])
-      setArtistNameInput(preselectedArtist || "");
-      if (fileInputRef.current) fileInputRef.current.value = ""
-      if (folderInputRef.current) folderInputRef.current.value = ""
-      
     } catch (err) {
-      console.error("Error detallado en handleSubmit:", err);
-      setError(err instanceof Error ? err.message : "Ocurrió un error durante la subida")
+      console.error("Error inesperado en el proceso de subida:", err);
+      setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
     } finally {
-      setIsLoading(false)
+      // Reset form and loading state
+      setIsLoading(false);
+      setFiles([]);
+      setArtistNameInput(preselectedArtist || "");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (folderInputRef.current) folderInputRef.current.value = "";
+      
+      // Clear messages after a delay
       setTimeout(() => {
-        setUploadProgress(0)
-        setSuccessCount(0)
-        setUploadErrors([])
-        setError(null)
-      }, 7000) // Increased timeout to see results
+        // Keep progress at 100%
+        // setUploadProgress(0); 
+        setSuccessCount(0);
+        setUploadErrors([]);
+        setError(null);
+      }, 15000); // Increased timeout to see results longer
     }
   }
 
