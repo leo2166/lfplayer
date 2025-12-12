@@ -3,13 +3,14 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Upload, Music, AlertCircle } from "lucide-react"
+import { Upload, Music, AlertCircle, FileCheck, FileX, Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group" // NEW IMPORT
+import { cn } from "@/lib/utils"
+
 
 interface Genre {
   id: string
@@ -20,12 +21,14 @@ interface Genre {
 interface UploadMusicProps {
   genres: Genre[]
   onUploadSuccess?: (songs: any[]) => void
-  preselectedArtist?: string // NEW PROP
+  preselectedArtist?: string
 }
 
-interface UploadError {
-  fileName: string
-  reason: string
+interface UploadStatus {
+  fileName: string;
+  status: 'Pendiente' | 'Subiendo a R2...' | 'Guardando en DB...' | 'Éxito' | 'Error';
+  message: string;
+  color: 'text-muted-foreground' | 'text-purple-600' | 'text-blue-600' | 'text-green-600' | 'text-red-600';
 }
 
 export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist }: UploadMusicProps) {
@@ -34,16 +37,22 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const [isLoading, setIsLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [uploadErrors, setUploadErrors] = useState<UploadError[]>([])
-  const [successCount, setSuccessCount] = useState(0)
+  
+  // New state for live diagnostic log
+  const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
   const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder');
   const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || "");
   const [isVerifying, setIsVerifying] = useState(false);
-  const [totalFiles, setTotalFiles] = useState(0);
+
+  // New states for initial validation
+  const [totalSelectedFiles, setTotalSelectedFiles] = useState(0);
+  const [nonMP3SkippedCount, setNonMP3SkippedCount] = useState(0);
   const [existingFiles, setExistingFiles] = useState(0);
+
 
   useEffect(() => {
     if (preselectedArtist) {
@@ -54,31 +63,34 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     }
   }, [preselectedArtist]);
 
+  const resetState = () => {
+      setFiles([]);
+      setError(null);
+      setUploadStatuses([]);
+      setIsVerifying(false);
+      setTotalSelectedFiles(0);
+      setNonMP3SkippedCount(0);
+      setExistingFiles(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (folderInputRef.current) folderInputRef.current.value = "";
+  }
+
   useEffect(() => {
-    setFiles([]);
-    setError(null);
-    setUploadErrors([]);
-    setSuccessCount(0);
-    setIsVerifying(false);
-    setTotalFiles(0);
-    setExistingFiles(0);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (folderInputRef.current) folderInputRef.current.value = "";
+    resetState();
   }, [uploadMode]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    setUploadErrors([]);
-    setSuccessCount(0);
-    setTotalFiles(0);
-    setExistingFiles(0);
-
+    resetState();
     const selectedFiles = e.target.files;
     if (!selectedFiles) return;
 
-    const audioFiles = Array.from(selectedFiles).filter((file) => file.name.toLowerCase().endsWith(".mp3"));
-    setTotalFiles(audioFiles.length);
+    setTotalSelectedFiles(selectedFiles.length);
 
+    const audioFiles = Array.from(selectedFiles).filter((file) => 
+        file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith(".mp3")
+    );
+    setNonMP3SkippedCount(selectedFiles.length - audioFiles.length);
+    
     if (uploadMode === 'folder' && audioFiles.length > 0 && audioFiles[0].webkitRelativePath) {
       const artistName = audioFiles[0].webkitRelativePath.split('/')[0];
       if (artistName) {
@@ -87,7 +99,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         try {
           const res = await fetch(`/api/artists/${encodeURIComponent(artistName)}/songs`);
           if (!res.ok) {
-            // If artist not found (404) or other error, treat all files as new
             console.warn(`Could not fetch existing songs for ${artistName}. Assuming all files are new.`);
             setFiles(audioFiles);
             setExistingFiles(0);
@@ -106,12 +117,11 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         } catch (error) {
           console.error("Error verifying files:", error);
           setError("Error al verificar archivos existentes. Se subirán todos los archivos.");
-          setFiles(audioFiles); // Fallback to uploading all files
+          setFiles(audioFiles);
         } finally {
           setIsVerifying(false);
         }
       } else {
-         // Fallback if artist name can't be determined
         setFiles(audioFiles);
       }
     } else {
@@ -119,92 +129,83 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     }
   };
 
+  const updateStatus = (fileName: string, status: UploadStatus['status'], message: string, color: UploadStatus['color']) => {
+    setUploadStatuses(prevStatuses => {
+      const newStatuses = [...prevStatuses];
+      const index = newStatuses.findIndex(s => s.fileName === fileName);
+      if (index !== -1) {
+        newStatuses[index] = { ...newStatuses[index], status, message, color };
+      }
+      return newStatuses;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setUploadErrors([])
-    setSuccessCount(0)
+    e.preventDefault();
+    setError(null);
+    setUploadProgress(0);
 
     if (files.length === 0 || !genre_id) {
-      setError("Por favor selecciona archivos de audio y un género")
-      return
+      setError("Por favor selecciona archivos de audio y un género.");
+      return;
+    }
+    if (uploadMode === 'files' && !artistNameInput.trim()) {
+      setError("Por favor ingresa el nombre del artista.");
+      return;
     }
 
-    if (uploadMode === 'files' && !artistNameInput.trim()) { // Validate artist name for individual files
-      setError("Por favor ingresa el nombre del artista para los archivos individuales.")
-      return
-    }
-
-    setIsLoading(true)
-    setUploadProgress(0)
+    setIsLoading(true);
+    setUploadStatuses(files.map(f => ({ fileName: f.name, status: 'Pendiente', message: 'En espera para procesar', color: 'text-muted-foreground' })));
 
     const allSavedSongs: any[] = [];
-    const allFailedUploads: UploadError[] = [];
-
+    
     try {
       let processedFileCount = 0;
       for (const file of files) {
         processedFileCount++;
+        const currentFileName = file.name;
         
         try {
-          console.log(`Procesando archivo ${processedFileCount} de ${files.length}: ${file.name}`);
-
-          // Step 1: Get presigned URL
+          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1 de 3: Subiendo archivo...', 'text-purple-600');
           const presignResponse = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ filename: file.name, contentType: file.type }),
+            body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
           });
-
-          if (!presignResponse.ok) {
-            throw new Error(`No se pudo obtener la URL de subida.`);
-          }
+          if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida.`);
           const { url, downloadUrl } = await presignResponse.json();
 
-          // Step 2: Upload to R2
-          const uploadResponse = await fetch(url, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type },
-          });
+          const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+          if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2.`);
 
-          if (!uploadResponse.ok) {
-            throw new Error(`Error al subir archivo a R2.`);
-          }
-
-          // Step 3: Get duration
+          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 2 de 3: Obteniendo metadatos...', 'text-blue-600');
           const audio = new Audio(downloadUrl);
           const duration = await new Promise<number>((resolve) => {
             audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
-            audio.onerror = () => {
-              console.warn(`No se pudo cargar metadatos para ${downloadUrl}. Duración será 0.`);
-              resolve(0);
-            }
+            audio.onerror = () => { console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); }
           });
 
           let songArtistName = artistNameInput.trim();
           if (uploadMode === 'folder' && !songArtistName && file.webkitRelativePath) {
-              songArtistName = file.webkitRelativePath.split("/")[0];
-          }
-          if (!songArtistName) {
+              songArtistName = file.webkitRelativePath.split("/")[0] || "Varios Artistas";
+          } else if (!songArtistName) {
               songArtistName = "Varios Artistas";
           }
           
           const songData = {
-            title: file.name.replace(/\.mp3$/i, ""),
+            title: currentFileName.replace(/\.mp3$/i, ""),
             artist: songArtistName,
             genre_id,
             blob_url: downloadUrl,
             duration,
           };
 
-          // Step 4: Save to Supabase
+          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3 de 3: Registrando canción...', 'text-blue-600');
           const saveRes = await fetch("/api/songs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(songData),
           });
-
           if (!saveRes.ok) {
             const errorData = await saveRes.json().catch(() => ({}));
             throw new Error(errorData.error || 'Error del servidor al guardar en DB.');
@@ -212,15 +213,13 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
           const savedSong = await saveRes.json();
           allSavedSongs.push(savedSong.songs[0]);
-          setSuccessCount(prev => prev + 1);
+          updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
 
         } catch (err) {
           const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-          console.error(`Fallo el proceso para ${file.name}:`, reason);
-          allFailedUploads.push({ fileName: file.name, reason });
-          setUploadErrors(prev => [...prev, { fileName: file.name, reason }]);
+          console.error(`Fallo el proceso para ${currentFileName}:`, reason);
+          updateStatus(currentFileName, 'Error', reason, 'text-red-600');
         } finally {
-          // Update progress after each file is processed (success or fail)
           const progress = (processedFileCount / files.length) * 100;
           setUploadProgress(progress);
         }
@@ -233,21 +232,12 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       console.error("Error inesperado en el proceso de subida:", err);
       setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
     } finally {
-      // Reset form and loading state
       setIsLoading(false);
-      setFiles([]);
-      setArtistNameInput(preselectedArtist || "");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      if (folderInputRef.current) folderInputRef.current.value = "";
-      
-      // Clear messages after a delay
+      // Don't reset immediately, let the user see the results.
       setTimeout(() => {
-        // Keep progress at 100%
-        // setUploadProgress(0); 
-        setSuccessCount(0);
-        setUploadErrors([]);
-        setError(null);
-      }, 15000); // Increased timeout to see results longer
+        resetState();
+        setUploadProgress(0);
+      }, 30000); // 30 seconds to review the log
     }
   }
 
@@ -259,22 +249,16 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Artist Input - Rendered only when adding to an existing artist */}
         {preselectedArtist && (
             <div>
                 <Label htmlFor="artistName">Añadir canciones a</Label>
-                <Input
-                    id="artistName"
-                    value={artistNameInput}
-                    className="mt-1"
-                    disabled
-                />
+                <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
             </div>
         )}
 
         <div>
           <Label htmlFor="genre">Género para todas las canciones *</Label>
-          <Select value={genre_id} onValueChange={setGenreId}>
+          <Select value={genre_id} onValueChange={setGenreId} disabled={isLoading}>
             <SelectTrigger className="mt-1">
               <SelectValue placeholder="Selecciona un género" />
             </SelectTrigger>
@@ -289,49 +273,34 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         </div>
 
         <div>
-          <Label>
-            {uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}
-          </Label>
+          <Label>{uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}</Label>
           <div className="hidden">
-            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3" multiple />
-            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3" multiple webkitdirectory="" />
+            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple disabled={isLoading}/>
+            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple webkitdirectory="" disabled={isLoading}/>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {uploadMode === 'files' ? (
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
                     Seleccionar Archivos
                 </Button>
             ) : (
-                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()}>
+                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()} disabled={isLoading}>
                     Seleccionar Carpeta
                 </Button>
             )}
           </div>
-          {isVerifying && (
-            <p className="text-sm text-muted-foreground mt-2">Verificando archivos existentes...</p>
-          )}
-          {!isVerifying && totalFiles > 0 && uploadMode === 'folder' && (
-            <div className="text-sm text-muted-foreground mt-2 space-y-1">
-              <p>Carpeta <span className="font-semibold">{artistNameInput}</span> seleccionada.</p>
-              <p>{totalFiles} archivos encontrados. {existingFiles} ya existen en la librería.</p>
-              <p className="font-bold text-purple-600">{files.length} nuevas canciones para subir.</p>
+          {isVerifying && <p className="text-sm text-muted-foreground mt-2">Verificando archivos existentes...</p>}
+          
+          {!isVerifying && totalSelectedFiles > 0 && (
+            <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
+                <p>Se encontraron <span className="font-bold">{totalSelectedFiles}</span> archivos en total.</p>
+                {nonMP3SkippedCount > 0 && <p className="text-amber-600">Se omitieron <span className="font-bold">{nonMP3SkippedCount}</span> archivos por no ser MP3.</p>}
+                <p> <span className="font-bold text-primary">{files.length + existingFiles}</span> archivos MP3 encontrados.</p>
+                {uploadMode === 'folder' && existingFiles > 0 && <p className="text-blue-600">{existingFiles} ya existen en la librería para el artista <span className="font-semibold">{artistNameInput}</span> y serán omitidos.</p>}
+                <p className="font-bold text-purple-600">{files.length} nuevas canciones para procesar.</p>
             </div>
-          )}
-           {!isVerifying && totalFiles > 0 && uploadMode === 'files' && (
-             <p className="text-sm text-muted-foreground mt-2">
-              {files.length} {files.length === 1 ? "archivo seleccionado" : "archivos seleccionados"} (
-              {(files.reduce((acc, file) => acc + file.size, 0) / 1024 / 1024).toFixed(2)} MB)
-            </p>
            )}
         </div>
-
-        {isLoading && (
-          <div className="space-y-2">
-            <Label>Subiendo {files.length} {files.length === 1 ? "canción" : "canciones"}...</Label>
-            <Progress value={uploadProgress} className="w-full" />
-            <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
-          </div>
-        )}
 
         {error && (
           <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm dark:bg-red-950 dark:text-red-200">
@@ -340,20 +309,48 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           </div>
         )}
 
-        {successCount > 0 && (
-          <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
-            <Music className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p>¡{successCount} {successCount === 1 ? "canción subida" : "canciones subidas"} exitosamente!</p>
+        {isLoading && (
+          <div className="space-y-3 pt-2">
+            <div className="space-y-2">
+                <Label>Procesando {files.length} {files.length === 1 ? "canción" : "canciones"}...</Label>
+                <Progress value={uploadProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-2 rounded-lg border bg-background p-3">
+              {uploadStatuses.map(s => (
+                <div key={s.fileName} className="flex items-center gap-3 text-sm">
+                  <div>
+                    {s.status === 'Pendiente' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                    {s.status === 'Subiendo a R2...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                    {s.status === 'Guardando en DB...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                    {s.status === 'Éxito' && <CheckCircle2 className={cn("w-4 h-4", s.color)} />}
+                    {s.status === 'Error' && <XCircle className={cn("w-4 h-4", s.color)} />}
+                  </div>
+                  <div className="flex-1 truncate">
+                    <p className="font-medium truncate" title={s.fileName}>{s.fileName}</p>
+                    <p className={cn("text-xs", s.color)}>{s.message}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-        
-        {uploadErrors.length > 0 && (
-          <div className="space-y-2 pt-2">
-             <Label className="text-red-600">Archivos con errores:</Label>
-             <ul className="text-xs text-red-600/90 list-disc list-inside bg-red-50 dark:bg-red-950/50 p-2 rounded-md">
-              {uploadErrors.map(err => <li key={err.fileName}><strong>{err.fileName}:</strong> {err.reason}</li>)}
-             </ul>
-          </div>
+
+        {!isLoading && uploadStatuses.length > 0 && (
+           <div className="space-y-2 pt-2">
+            <h4 className="font-semibold">Resumen de la Subida</h4>
+             <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
+                <FileCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p>{uploadStatuses.filter(s => s.status === 'Éxito').length} canciones procesadas exitosamente.</p>
+             </div>
+             {uploadStatuses.some(s => s.status === 'Error') && (
+                <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm dark:bg-red-950 dark:text-red-200">
+                    <FileX className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <p>{uploadStatuses.filter(s => s.status === 'Error').length} canciones fallaron.</p>
+                </div>
+             )}
+             <p className="text-xs text-muted-foreground">El formulario se reiniciará en 30 segundos.</p>
+           </div>
         )}
 
         <Button
@@ -361,7 +358,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           disabled={isLoading || isVerifying || files.length === 0}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Subiendo...` : isVerifying ? 'Verificando...' : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
+          {isLoading ? `Procesando...` : isVerifying ? 'Verificando...' : `Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
       </form>
     </div>
