@@ -22,6 +22,7 @@ interface UploadMusicProps {
   genres: Genre[]
   onUploadSuccess?: (songs: any[]) => void
   preselectedArtist?: string
+  preselectedGenreId?: string
 }
 
 interface UploadStatus {
@@ -31,13 +32,14 @@ interface UploadStatus {
   color: 'text-muted-foreground' | 'text-purple-600' | 'text-blue-600' | 'text-green-600' | 'text-red-600';
 }
 
-export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist }: UploadMusicProps) {
-  const [genre_id, setGenreId] = useState("")
+export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist, preselectedGenreId }: UploadMusicProps) {
+  const [genre_id, setGenreId] = useState(preselectedGenreId || "")
   const [files, setFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
+  const [debugLog, setDebugLog] = useState<string[]>([]); // New state for debug logs
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -49,10 +51,14 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     if (preselectedArtist) {
       setArtistNameInput(preselectedArtist);
       setUploadMode('files');
-    } else {
-      setArtistNameInput("");
     }
   }, [preselectedArtist]);
+
+  useEffect(() => {
+    if (preselectedGenreId) {
+      setGenreId(preselectedGenreId);
+    }
+  }, [preselectedGenreId]);
 
   const resetState = () => {
       setFiles([]);
@@ -60,6 +66,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       setUploadStatuses([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (folderInputRef.current) folderInputRef.current.value = "";
+      // Only reset genre if it's NOT pre-selected.
+      if (!preselectedGenreId) {
+        setGenreId("");
+      }
   }
 
   useEffect(() => {
@@ -95,6 +105,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     e.target.value = '';
   };
 
+  const log = (message: string) => {
+    setDebugLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  }
+
   const updateStatus = (fileName: string, status: UploadStatus['status'], message: string, color: UploadStatus['color']) => {
     setUploadStatuses(prevStatuses => {
       const newStatuses = [...prevStatuses];
@@ -110,6 +124,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     e.preventDefault();
     setError(null);
     setUploadProgress(0);
+    setDebugLog([]); // Clear debug log on new upload
 
     // NO VALIDATION HERE - just proceed with the current state
     // The following checks are removed as per user's "cero validaciones" directive
@@ -128,6 +143,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         const currentFileName = file.name;
         
         try {
+          log(`[${currentFileName}] Iniciando proceso...`);
           // Additional check for MP3 validity during processing, as no pre-filter
           if (!file.name.toLowerCase().endsWith(".mp3")) {
             throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
@@ -140,52 +156,78 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             throw new Error("Artista no especificado.");
           }
 
-
-          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1 de 3: Subiendo archivo...', 'text-purple-600');
+          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1 de 3: Obteniendo URL firmada...', 'text-purple-600');
+          log(`[${currentFileName}] Solicitando URL firmada a /api/upload...`);
           const presignResponse = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
           });
-          if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida.`);
+
+          if (!presignResponse.ok) {
+            const errorText = await presignResponse.text();
+            log(`[${currentFileName}] ERROR en presign: ${presignResponse.status} ${errorText}`);
+            throw new Error(`No se pudo obtener la URL de subida.`);
+          }
           const { url, downloadUrl } = await presignResponse.json();
+          log(`[${currentFileName}] URL firmada obtenida. Subiendo a R2...`);
+
 
           const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-          if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2.`);
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            log(`[${currentFileName}] ERROR al subir a R2: ${uploadResponse.status} ${errorText}`);
+            throw new Error(`Error al subir archivo a R2.`);
+          }
+          log(`[${currentFileName}] Subida a R2 exitosa. Obteniendo duración...`);
+
 
           updateStatus(currentFileName, 'Guardando en DB...', 'Paso 2 de 3: Obteniendo metadatos...', 'text-blue-600');
           const audio = new Audio(downloadUrl);
           const duration = await new Promise<number>((resolve) => {
-            audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
-            audio.onerror = () => { console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); }
+            audio.onloadedmetadata = () => {
+              log(`[${currentFileName}] Metadatos cargados. Duración: ${audio.duration}`);
+              resolve(Math.floor(audio.duration));
+            }
+            audio.onerror = () => { 
+              log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos de audio desde ${downloadUrl}. Duración será 0.`);
+              console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); 
+            }
           });
 
-          // Allow empty artistNameInput and genre_id, as per "cero validaciones"
           const songData = {
             title: currentFileName.replace(/\.mp3$/i, ""),
-            artist: artistNameInput.trim(), // Use as is, will be checked by explicit validation above
-            genre_id: genre_id, // Use as is, will be checked by explicit validation above
+            artist: artistNameInput.trim(),
+            genre_id: genre_id,
             blob_url: downloadUrl,
             duration,
           };
+          log(`[${currentFileName}] Datos de canción preparados: ${JSON.stringify(songData)}`);
 
           updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3 de 3: Registrando canción...', 'text-blue-600');
+          log(`[${currentFileName}] Enviando a /api/songs...`);
           const saveRes = await fetch("/api/songs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(songData),
           });
+          
+          const saveResClone = saveRes.clone(); // Clone the response to read it multiple times
+
           if (!saveRes.ok) {
-            const errorData = await saveRes.json().catch(() => ({}));
+            const errorData = await saveResClone.json().catch(() => ({ error: 'Respuesta de error no es JSON' }));
+            log(`[${currentFileName}] ERROR al guardar en DB: ${saveRes.status} ${JSON.stringify(errorData)}`);
             throw new Error(errorData.error || 'Error del servidor al guardar en DB.');
           }
 
           const savedSong = await saveRes.json();
           allSavedSongs.push(savedSong.songs[0]);
+          log(`[${currentFileName}] Éxito al guardar en DB. Respuesta: ${JSON.stringify(savedSong)}`);
           updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
 
         } catch (err) {
           const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
+          log(`[${currentFileName}] FALLO CATASTRÓFICO: ${reason}`);
           console.error(`Fallo el proceso para ${currentFileName}:`, reason);
           updateStatus(currentFileName, 'Error', reason, 'text-red-600');
         } finally {
@@ -234,7 +276,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         <div>
           <Label htmlFor="genre">Género para todas las canciones *</Label>
-          <Select value={genre_id} onValueChange={setGenreId} disabled={isLoading}>
+          <Select value={genre_id} onValueChange={setGenreId} disabled={isLoading || !!preselectedGenreId}>
             <SelectTrigger id="genre" className="mt-1">
               <SelectValue placeholder="Selecciona un género" />
             </SelectTrigger>
@@ -322,6 +364,17 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
              )}
              <p className="text-xs text-muted-foreground">El formulario se reiniciará en 30 segundos.</p>
            </div>
+        )}
+
+        {debugLog.length > 0 && (
+          <div className="space-y-2 pt-4">
+            <h4 className="font-semibold text-sm">Registro de Diagnóstico Detallado</h4>
+            <div className="max-h-64 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
+              {debugLog.map((msg, index) => (
+                <p key={index} className="whitespace-pre-wrap break-words">{msg}</p>
+              ))}
+            </div>
+          </div>
         )}
 
         <Button

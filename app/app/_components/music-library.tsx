@@ -48,6 +48,7 @@ export default function MusicLibrary() { // Props removed
   const [hasMounted, setHasMounted] = useState(false)
   const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false) // New state
   const [artistToAddSongTo, setArtistToAddSongTo] = useState<string | undefined>(undefined) // New state
+  const [genreToAddSongTo, setGenreToAddSongTo] = useState<string | undefined>(undefined)
 
   // State for delete summary modal
   const [showDeleteSummary, setShowDeleteSummary] = useState(false);
@@ -412,6 +413,7 @@ export default function MusicLibrary() { // Props removed
                       onClick={(e) => {
                         e.stopPropagation();
                         setArtistToAddSongTo(artist);
+                        setGenreToAddSongTo(artistSongs[0]?.genre_id); // Capture genre_id
                         setAddIndividualMusicOpen(true);
                       }}
                       className="h-8 w-8 text-primary hover:bg-primary/10"
@@ -469,6 +471,7 @@ export default function MusicLibrary() { // Props removed
                 refetchSongs();
               }}
               preselectedArtist={artistToAddSongTo}
+              preselectedGenreId={genreToAddSongTo}
             />
 
             {/* Delete Summary AlertDialog */}
