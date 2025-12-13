@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
 import { useUserRole, useSetUserRole } from "@/contexts/UserRoleContext"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
+import { MusicLibraryProvider } from "@/contexts/MusicLibraryContext" // NEW IMPORT
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
 
 export default function ClientLayout({
@@ -190,7 +191,9 @@ export default function ClientLayout({
           </header>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <MusicLibraryProvider>
+            <main className="flex-1 overflow-y-auto">{children}</main>
+          </MusicLibraryProvider>
         </div>
 
         {/* PWA Install Button */}
