@@ -67,3 +67,5 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, pr
     </Dialog>
   )
 }
+
+// Force re-build
