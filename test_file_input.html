@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test File Input</title>
+</head>
+<body>
+    <h1>Test de Selección de Archivos</h1>
+    <p>Por favor, selecciona algunos archivos o una carpeta usando los botones de abajo.</p>
+
+    <input type="file" id="singleFileInput" onchange="handleFileSelect(event, 'single')">
+    <label for="singleFileInput">Seleccionar un archivo</label>
+    <br><br>
+
+    <input type="file" id="multipleFileInput" onchange="handleFileSelect(event, 'multiple')" multiple>
+    <label for="multipleFileInput">Seleccionar múltiples archivos</label>
+    <br><br>
+
+    <input type="file" id="folderInput" onchange="handleFileSelect(event, 'folder')" webkitdirectory directory>
+    <label for="folderInput">Seleccionar una carpeta</label>
+
+    <div id="output"></div>
+
+    <script>
+        function handleFileSelect(event, type) {
+            const files = event.target.files;
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = ''; // Clear previous output
+
+            console.log(`--- Test: ${type} ---`);
+            console.log('event.target.files:', files);
+            console.log('files.length:', files ? files.length : 'null');
+
+            if (files && files.length > 0) {
+                outputDiv.innerHTML += `<h3>Archivos seleccionados (${files.length}):</h3>`;
+                for (let i = 0; i < files.length; i++) {
+                    outputDiv.innerHTML += `<p><strong>${i + 1}. Nombre:</strong> ${files[i].name} | <strong>Tipo:</strong> ${files[i].type} | <strong>Tamaño:</strong> ${files[i].size} bytes</p>`;
+                }
+            } else {
+                outputDiv.innerHTML += `<p style="color: red;"><strong>No se detectaron archivos en event.target.files.</strong></p>`;
+            }
+            console.log('--- Fin del Test ---');
+        }
+    </script>
+</body>
+</html>
