@@ -41,6 +41,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|icon-dark-32x32.png|icon-light-32x32.png|manifest.json).*)",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - all icon files in /public
+     * - manifest.json
+     */
+    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|apple-icon\\.png|icon-dark-32x32\\.png|icon-light-32x32\\.png|manifest\\.json|icon-192x192\\.png|icon-256x256\\.png|icon-384x384\\.png|icon-512x512\\.png).*)",
   ],
 }
