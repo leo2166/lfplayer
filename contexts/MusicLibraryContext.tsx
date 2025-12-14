@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import type { Song, Genre } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -18,15 +18,24 @@ export function MusicLibraryProvider({
   initialGenres: propInitialGenres,
 }: {
   children: ReactNode;
-  initialSongs: Song[] | undefined; 
+  initialSongs: Song[] | undefined;
   initialGenres: Genre[] | undefined;
 }) {
   const initialSongs = Array.isArray(propInitialSongs) ? propInitialSongs : [];
   const initialGenres = Array.isArray(propInitialGenres) ? propInitialGenres : [];
 
   const [songs, setSongs] = useState<Song[]>(initialSongs);
-  const [genres] = useState<Genre[]>(initialGenres);
+  const [genres, setGenres] = useState<Genre[]>(initialGenres); // Fix: genres needed setter
   const router = useRouter();
+
+  // Update state when initial props change (e.g. after router.refresh())
+  useEffect(() => {
+    setSongs(initialSongs);
+  }, [initialSongs]);
+
+  useEffect(() => {
+    setGenres(initialGenres);
+  }, [initialGenres]);
 
   const refetchSongs = useCallback(async () => {
     try {
