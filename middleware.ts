@@ -46,9 +46,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - all icon files in /public
-     * - manifest.json
+     * - public folder files (common extensions)
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|apple-icon\\.png|icon-dark-32x32\\.png|icon-light-32x32\\.png|manifest\\.json|icon-192x192\\.png|icon-256x256\\.png|icon-384x384\\.png|icon-512x512\\.png).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|ico)$).*)",
   ],
 }
