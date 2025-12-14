@@ -47,7 +47,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
   const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder');
   const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || "");
-  
+
   useEffect(() => {
     if (preselectedArtist) {
       setArtistNameInput(preselectedArtist);
@@ -62,15 +62,15 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   }, [preselectedGenreId]);
 
   const resetState = () => {
-      setFiles([]);
-      setError(null);
-      setUploadStatuses([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      if (folderInputRef.current) folderInputRef.current.value = "";
-      // Only reset genre if it's NOT pre-selected.
-      if (!preselectedGenreId) {
-        setGenreId("");
-      }
+    setFiles([]);
+    setError(null);
+    setUploadStatuses([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+    // Only reset genre if it's NOT pre-selected.
+    if (!preselectedGenreId) {
+      setGenreId("");
+    }
   }
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // First, capture the files from the event.
     const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
-    
+
     // Manually reset UI states from previous uploads without clearing the input field yet.
     setError(null);
     setUploadStatuses([]);
@@ -90,17 +90,17 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
     // If folder upload, automatically extract artist name from the relative path.
     if (uploadMode === 'folder') {
-        if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
-            const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
-            if (artistName) {
-                setArtistNameInput(artistName);
-            }
-        } else {
-             // If no files are selected (e.g., user cancels), reset artist name
-            setArtistNameInput(preselectedArtist || "");
+      if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
+        const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
+        if (artistName) {
+          setArtistNameInput(artistName);
         }
+      } else {
+        // If no files are selected (e.g., user cancels), reset artist name
+        setArtistNameInput(preselectedArtist || "");
+      }
     }
-    
+
     // It's important to clear the input value to allow selecting the same file(s) again.
     // The event target is the specific input that was used.
     e.target.value = '';
@@ -140,7 +140,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
       try {
         log(`[${currentFileName}] Iniciando proceso...`);
-        
+
         if (!file.name.toLowerCase().endsWith(".mp3")) throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
         if (!genre_id) throw new Error("Género no seleccionado.");
         if (!artistNameInput.trim()) throw new Error("Artista no especificado.");
@@ -158,22 +158,62 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
         log(`[${currentFileName}] Subiendo a R2...`);
-        const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-        if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
-        log(`[${currentFileName}] Subida a R2 exitosa.`);
-        
+
+        // Upload with timeout
+        const uploadController = new AbortController();
+        const uploadTimeout = setTimeout(() => uploadController.abort(), 60000); // 60s timeout
+
+        try {
+          const uploadResponse = await fetch(url, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+            signal: uploadController.signal
+          });
+          clearTimeout(uploadTimeout);
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
+          }
+          log(`[${currentFileName}] Subida a R2 completada (status ${uploadResponse.status}).`);
+
+          // VERIFICAR que el archivo realmente existe en R2
+          log(`[${currentFileName}] Verificando existencia en R2...`);
+          const verifyResponse = await fetch(downloadUrl, { method: "HEAD" });
+          if (!verifyResponse.ok) {
+            throw new Error(`Archivo no encontrado en R2 después de subir (${verifyResponse.status})`);
+          }
+          log(`[${currentFileName}] Verificación R2 exitosa.`);
+
+        } catch (uploadError) {
+          clearTimeout(uploadTimeout);
+          if (uploadError instanceof Error && uploadError.name === 'AbortError') {
+            throw new Error(`Timeout al subir a R2 (más de 60 segundos)`);
+          }
+          throw uploadError;
+        }
+
         updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3/4: Obteniendo metadatos', 'text-blue-600');
         log(`[${currentFileName}] Obteniendo duración...`);
         const audio = new Audio(downloadUrl);
-        const duration = await new Promise<number>((resolve) => {
-          audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
-          audio.onerror = () => {
-            log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos. Duración será 0.`);
+        const duration = await new Promise<number>((resolve, reject) => {
+          const metadataTimeout = setTimeout(() => {
+            log(`[${currentFileName}] TIMEOUT obteniendo metadatos. Usando duración 0.`);
             resolve(0);
-          }
+          }, 10000); // 10s timeout for metadata
+
+          audio.onloadedmetadata = () => {
+            clearTimeout(metadataTimeout);
+            resolve(Math.floor(audio.duration));
+          };
+          audio.onerror = () => {
+            clearTimeout(metadataTimeout);
+            log(`[${currentFileName}] ADVERTENCIA: Error al cargar metadatos. Duración será 0.`);
+            resolve(0);
+          };
         });
         log(`[${currentFileName}] Duración: ${duration}s`);
-        
+
         const songData = {
           title: currentFileName.replace(/\.mp3$/i, ""),
           artist: artistNameInput.trim(),
@@ -181,7 +221,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           blob_url: downloadUrl,
           duration,
         };
-        
+
         updateStatus(currentFileName, 'Guardando en DB...', 'Paso 4/4: Registrando canción en DB', 'text-blue-600');
         log(`[${currentFileName}] Guardando en DB...`);
         const saveRes = await fetch("/api/songs", {
@@ -189,20 +229,34 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(songData),
         });
-        
+
         const savedSongResponse = await saveRes.json();
+
+        // Handle duplicate detection (409 status)
+        if (saveRes.status === 409) {
+          log(`[${currentFileName}] DUPLICADO DETECTADO: Esta canción ya existe en la biblioteca.`);
+          log(`[${currentFileName}] Iniciando limpieza del archivo duplicado en R2...`);
+          await fetch("/api/cleanup", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ blob_url: downloadUrl }),
+          });
+          log(`[${currentFileName}] Limpieza completada.`);
+          throw new Error("Esta canción ya existe en tu biblioteca. No se permiten duplicados.");
+        }
+
         if (!saveRes.ok || !savedSongResponse.songs || savedSongResponse.songs.length === 0) {
           log(`[${currentFileName}] ¡VERIFICACIÓN FALLIDA! La DB no devolvió la canción guardada.`);
           log(`[${currentFileName}] Iniciando limpieza: eliminando archivo huérfano de R2...`);
-          await fetch("/api/songs", {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ blob_url: downloadUrl }),
+          await fetch("/api/cleanup", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ blob_url: downloadUrl }),
           });
           log(`[${currentFileName}] Limpieza completada.`);
           throw new Error(savedSongResponse.error || "Verificación fallida: DB no registró la canción.");
         }
-        
+
         allSavedSongs.push(savedSongResponse.songs[0]);
         log(`[${currentFileName}] ÉXITO: Verificación completada.`);
         updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
@@ -219,14 +273,14 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
         setUploadProgress(progress);
       }
-      
-      await delay(500); // Wait 500ms before starting the next file
+
+      await delay(2000); // Wait 2 seconds before starting the next file
     }
-    
+
     if (!anErrorOccurred) {
       onUploadSuccess?.(allSavedSongs);
     }
-    
+
     setIsLoading(false);
   }
 
@@ -239,16 +293,16 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {preselectedArtist ? (
-            <div>
-                <Label htmlFor="artistName">Añadir canciones a</Label>
-                <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
-            </div>
+          <div>
+            <Label htmlFor="artistName">Añadir canciones a</Label>
+            <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
+          </div>
         ) : (
-           uploadMode === 'folder' && artistNameInput && 
-           <div className="space-y-1">
-               <Label>Carpeta a subir (artista):</Label>
-               <p className="font-bold text-green-600 text-lg">{artistNameInput}</p>
-           </div>
+          uploadMode === 'folder' && artistNameInput &&
+          <div className="space-y-1">
+            <Label>Carpeta a subir (artista):</Label>
+            <p className="font-bold text-green-600 text-lg">{artistNameInput}</p>
+          </div>
         )}
 
         <div>
@@ -270,26 +324,26 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         <div>
           <Label htmlFor={uploadMode === 'files' ? "file-upload" : "folder-upload"}>{uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}</Label>
           <div className="hidden">
-            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple disabled={isLoading}/>
-            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple webkitdirectory="" disabled={isLoading}/>
+            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple disabled={isLoading} />
+            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple webkitdirectory="" disabled={isLoading} />
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {uploadMode === 'files' ? (
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                    Seleccionar Archivos
-                </Button>
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                Seleccionar Archivos
+              </Button>
             ) : (
-                <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()}>
-                    Seleccionar Carpeta
-                </Button>
+              <Button type="button" variant="outline" onClick={() => folderInputRef.current?.click()}>
+                Seleccionar Carpeta
+              </Button>
             )}
           </div>
-          
+
           {files.length > 0 && (
             <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
-                <p className="font-bold text-purple-600">{files.length} archivos seleccionados.</p>
+              <p className="font-bold text-purple-600">{files.length} archivos seleccionados.</p>
             </div>
-           )}
+          )}
         </div>
 
         {error && (
@@ -302,9 +356,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         {isLoading && (
           <div className="space-y-3 pt-2">
             <div className="space-y-2">
-                <Label>Procesando {files.length} {files.length === 1 ? 'archivo' : 'archivos'}...</Label>
-                <Progress value={uploadProgress} className="w-full" />
-                <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
+              <Label>Procesando {files.length} {files.length === 1 ? 'archivo' : 'archivos'}...</Label>
+              <Progress value={uploadProgress} className="w-full" />
+              <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
             </div>
             <div className="max-h-60 overflow-y-auto space-y-2 rounded-lg border bg-background p-3">
               {uploadStatuses.map(s => (
@@ -327,20 +381,19 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         )}
 
         {!isLoading && uploadStatuses.length > 0 && (
-           <div className="space-y-2 pt-2">
+          <div className="space-y-2 pt-2">
             <h4 className="font-semibold">Resumen de la Subida</h4>
-             <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
-                <FileCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <p>{uploadStatuses.filter(s => s.status === 'Éxito').length} archivos procesados exitosamente.</p>
-             </div>
-             {uploadStatuses.some(s => s.status === 'Error') && (
-                <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm dark:bg-red-950 dark:text-red-200">
-                    <FileX className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <p>{uploadStatuses.filter(s => s.status === 'Error').length} archivos fallaron.</p>
-                </div>
-             )}
-             <p className="text-xs text-muted-foreground">El formulario se reiniciará en 30 segundos.</p>
-           </div>
+            <div className="flex gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm dark:bg-green-950 dark:text-green-200">
+              <FileCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p>{uploadStatuses.filter(s => s.status === 'Éxito').length} archivos procesados exitosamente.</p>
+            </div>
+            {uploadStatuses.some(s => s.status === 'Error') && (
+              <div className="flex gap-2 p-3 rounded-lg bg-red-50 text-red-700 text-sm dark:bg-red-950 dark:text-red-200">
+                <FileX className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p>{uploadStatuses.filter(s => s.status === 'Error').length} archivos fallaron.</p>
+              </div>
+            )}
+          </div>
         )}
 
         {debugLog.length > 0 && (

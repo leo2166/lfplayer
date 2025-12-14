@@ -94,7 +94,33 @@ export async function POST(request: NextRequest) {
     }
 
     if (songsToInsert.length === 0) {
-        return NextResponse.json({ error: "No songs to insert" }, { status: 400 });
+      return NextResponse.json({ error: "No songs to insert" }, { status: 400 });
+    }
+
+    // Check for duplicates BEFORE inserting
+    const duplicateChecks = await Promise.all(
+      songsToInsert.map(song =>
+        supabase
+          .from("songs")
+          .select("id, title, artist")
+          .eq("user_id", user.id)
+          .eq("title", song.title)
+          .eq("artist", song.artist)
+          .maybeSingle()
+      )
+    )
+
+    const duplicates = duplicateChecks
+      .map((result, index) => ({ result, song: songsToInsert[index] }))
+      .filter(({ result }) => result.data !== null)
+
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map(d => `"${d.song.title}" por ${d.song.artist}`)
+      console.log("Duplicates detected:", duplicateNames)
+      return NextResponse.json({
+        error: `Las siguientes canciones ya existen en tu biblioteca: ${duplicateNames.join(", ")}`,
+        duplicates: duplicateNames
+      }, { status: 409 })
     }
 
     const { data, error } = await supabase.from("songs").insert(songsToInsert).select()
@@ -102,7 +128,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       throw error;
     }
-    
+
     console.log("Canciones insertadas en Supabase:", data);
     revalidatePath('/app');
     return NextResponse.json({ songs: data })
@@ -110,11 +136,11 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     let errorMessage = "An unknown error occurred.";
     if (typeof err === 'object' && err !== null && 'message' in err) {
-        errorMessage = (err as { message: string }).message;
+      errorMessage = (err as { message: string }).message;
     } else if (err instanceof Error) {
-        errorMessage = err.message;
+      errorMessage = err.message;
     } else if (typeof err === 'string') {
-        errorMessage = err;
+      errorMessage = err;
     }
 
     console.error("Error creating song(s):", errorMessage);
@@ -149,10 +175,10 @@ export async function DELETE(request: NextRequest) {
       try {
         const url = new URL(blob_url)
         const objectKey = url.pathname.substring(1)
-        
+
         const deleteCommand = new DeleteObjectCommand({
-            Bucket: CLOUDFLARE_R2_BUCKET_NAME,
-            Key: objectKey,
+          Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+          Key: objectKey,
         });
 
         await r2.send(deleteCommand);
