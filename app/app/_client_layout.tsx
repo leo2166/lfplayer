@@ -22,10 +22,10 @@ export default function ClientLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { closePlayer } = useMusicPlayer()
-  const supabase = createBrowserClient(
+  const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  ))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
   const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook

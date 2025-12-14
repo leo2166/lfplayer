@@ -82,7 +82,7 @@ export default function MusicLibrary() { // Props removed
 
   useEffect(() => {
     setHasMounted(true);
-  }, []);
+  }, []); // Empty dependency array ensures this runs once.
 
   const router = useRouter() // Keep useRouter for general navigation, not for refresh
   const { playSong, currentSong, isPlaying } = useMusicPlayer()
