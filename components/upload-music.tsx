@@ -125,132 +125,115 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     e.preventDefault();
     setError(null);
     setUploadProgress(0);
-    setDebugLog([]); // Clear debug log on new upload
-
-    // NO VALIDATION HERE - just proceed with the current state
-    // The following checks are removed as per user's "cero validaciones" directive
-    // if (files.length === 0 || !genre_id) { setError("..."); return; }
-    // if (!artistNameInput.trim()) { setError("..."); return; }
+    setDebugLog([]);
 
     setIsLoading(true);
     setUploadStatuses(files.map(f => ({ fileName: f.name, status: 'Pendiente', message: 'En espera para procesar', color: 'text-muted-foreground' })));
 
     const allSavedSongs: any[] = [];
-    
-    try {
-      let processedFileCount = 0;
-      for (const file of files) {
-        processedFileCount++;
-        const currentFileName = file.name;
-        
-        try {
-          log(`[${currentFileName}] Iniciando proceso...`);
-          // Additional check for MP3 validity during processing, as no pre-filter
-          if (!file.name.toLowerCase().endsWith(".mp3")) {
-            throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
-          }
-          // Additional check for genre_id and artistNameInput
-          if (!genre_id) {
-            throw new Error("Género no seleccionado.");
-          }
-          if (!artistNameInput.trim()) {
-            throw new Error("Artista no especificado.");
-          }
+    let processedFileCount = 0;
 
-          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1 de 3: Obteniendo URL firmada...', 'text-purple-600');
-          log(`[${currentFileName}] Solicitando URL firmada a /api/upload...`);
+    try { // Outer try-catch to stop the entire process
+      for (const file of files) {
+        const currentFileName = file.name;
+
+        try { // Inner try-catch for individual file processing
+          log(`[${currentFileName}] Iniciando proceso...`);
+          
+          if (!file.name.toLowerCase().endsWith(".mp3")) throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
+          if (!genre_id) throw new Error("Género no seleccionado.");
+          if (!artistNameInput.trim()) throw new Error("Artista no especificado.");
+
+          // 1. Get Presigned URL
+          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1/4: Obteniendo URL firmada', 'text-purple-600');
+          log(`[${currentFileName}] Solicitando URL firmada...`);
           const presignResponse = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
           });
-
-          if (!presignResponse.ok) {
-            const errorText = await presignResponse.text();
-            log(`[${currentFileName}] ERROR en presign: ${presignResponse.status} ${errorText}`);
-            throw new Error(`No se pudo obtener la URL de subida.`);
-          }
+          if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
           const { url, downloadUrl } = await presignResponse.json();
-          log(`[${currentFileName}] URL firmada obtenida. Subiendo a R2...`);
+          log(`[${currentFileName}] URL obtenida.`);
 
-
+          // 2. Upload to R2
+          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
+          log(`[${currentFileName}] Subiendo a R2...`);
           const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            log(`[${currentFileName}] ERROR al subir a R2: ${uploadResponse.status} ${errorText}`);
-            throw new Error(`Error al subir archivo a R2.`);
-          }
-          log(`[${currentFileName}] Subida a R2 exitosa. Obteniendo duración...`);
-
-
-          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 2 de 3: Obteniendo metadatos...', 'text-blue-600');
+          if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
+          log(`[${currentFileName}] Subida a R2 exitosa.`);
+          
+          // 3. Get Duration
+          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3/4: Obteniendo metadatos', 'text-blue-600');
+          log(`[${currentFileName}] Obteniendo duración...`);
           const audio = new Audio(downloadUrl);
           const duration = await new Promise<number>((resolve) => {
-            audio.onloadedmetadata = () => {
-              log(`[${currentFileName}] Metadatos cargados. Duración: ${audio.duration}`);
-              resolve(Math.floor(audio.duration));
-            }
-            audio.onerror = () => { 
-              log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos de audio desde ${downloadUrl}. Duración será 0.`);
-              console.warn(`No se pudo cargar metadatos. Duración será 0.`); resolve(0); 
+            audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
+            audio.onerror = () => {
+              log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos. Duración será 0.`);
+              resolve(0);
             }
           });
-
+          log(`[${currentFileName}] Duración: ${duration}s`);
+          
           const songData = {
             title: currentFileName.replace(/\.mp3$/i, ""),
             artist: artistNameInput.trim(),
-            genre_id: genre_id,
+            genre_id,
             blob_url: downloadUrl,
             duration,
           };
-          log(`[${currentFileName}] Datos de canción preparados: ${JSON.stringify(songData)}`);
-
-          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3 de 3: Registrando canción...', 'text-blue-600');
-          log(`[${currentFileName}] Enviando a /api/songs...`);
+          
+          // 4. Save to DB
+          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 4/4: Registrando canción en DB', 'text-blue-600');
+          log(`[${currentFileName}] Guardando en DB...`);
           const saveRes = await fetch("/api/songs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(songData),
           });
           
-          const saveResClone = saveRes.clone(); // Clone the response to read it multiple times
-
-          if (!saveRes.ok) {
-            const errorData = await saveResClone.json().catch(() => ({ error: 'Respuesta de error no es JSON' }));
-            log(`[${currentFileName}] ERROR al guardar en DB: ${saveRes.status} ${JSON.stringify(errorData)}`);
-            throw new Error(errorData.error || 'Error del servidor al guardar en DB.');
+          // 5. VERIFICATION
+          const savedSongResponse = await saveRes.json();
+          if (!saveRes.ok || !savedSongResponse.songs || savedSongResponse.songs.length === 0) {
+            log(`[${currentFileName}] ¡VERIFICACIÓN FALLIDA! La DB no devolvió la canción guardada.`);
+            log(`[${currentFileName}] Iniciando limpieza: eliminando archivo huérfano de R2...`);
+            await fetch("/api/songs", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ blob_url: downloadUrl }),
+            });
+            log(`[${currentFileName}] Limpieza completada.`);
+            throw new Error(savedSongResponse.error || "Verificación fallida: DB no registró la canción.");
           }
-
-          const savedSong = await saveRes.json();
-          allSavedSongs.push(savedSong.songs[0]);
-          log(`[${currentFileName}] Éxito al guardar en DB. Respuesta: ${JSON.stringify(savedSong)}`);
+          
+          allSavedSongs.push(savedSongResponse.songs[0]);
+          log(`[${currentFileName}] ÉXITO: Verificación completada.`);
           updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
 
         } catch (err) {
           const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-          log(`[${currentFileName}] FALLO CATASTRÓFICO: ${reason}`);
-          console.error(`Fallo el proceso para ${currentFileName}:`, reason);
+          log(`[${currentFileName}] FALLO: ${reason}`);
           updateStatus(currentFileName, 'Error', reason, 'text-red-600');
+          throw err; // Re-throw to be caught by the outer catch, stopping the process
         } finally {
-          // Handle case where files.length might be 0 if the original selection was empty
+          processedFileCount++;
           const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
           setUploadProgress(progress);
         }
       }
-
-      console.log("Proceso de subida finalizado.");
       onUploadSuccess?.(allSavedSongs);
-
-    } catch (err) {
-      console.error("Error inesperado en el proceso de subida:", err);
-      // Removed the general error message as per "cero validaciones", now specific in-loop errors handle it.
-      // setError("Ocurrió un error general durante la subida. Revisa la consola para más detalles.");
+      
+    } catch (finalError) {
+      console.error("Proceso de subida detenido por un error:", finalError);
+      setError(`El proceso se detuvo debido a un error en el archivo: ${(finalError as any).fileName || files[processedFileCount]?.name || 'desconocido'}. Detalles en el registro.`);
     } finally {
       setIsLoading(false);
-      setTimeout(() => {
-        resetState();
-        setUploadProgress(0);
-      }, 30000); 
+      // No auto-resetting here to allow user to see the logs
+      // setTimeout(() => {
+      //   resetState();
+      //   setUploadProgress(0);
+      // }, 30000); 
     }
   }
 
