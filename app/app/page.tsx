@@ -10,8 +10,8 @@ export default async function AppPage() {
 
   // Fetch songs and genres in parallel
   const [{ data: songsData }, { data: genresData }] = await Promise.all([
-    supabase.from("songs").select("*"),
-    supabase.from("genres").select("*"),
+    supabase.from("songs").select("*").order('title', { ascending: true }),
+    supabase.from("genres").select("*").order('name', { ascending: true }),
   ])
 
   const songs: Song[] = songsData ?? []
