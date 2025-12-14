@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, type ReactNode, useCallback, useEffect, useMemo } from 'react';
 import type { Song, Genre } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -21,11 +21,13 @@ export function MusicLibraryProvider({
   initialSongs: Song[] | undefined;
   initialGenres: Genre[] | undefined;
 }) {
-  const initialSongs = Array.isArray(propInitialSongs) ? propInitialSongs : [];
-  const initialGenres = Array.isArray(propInitialGenres) ? propInitialGenres : [];
+  // Fix: Memoize initial values to prevent infinite re-render loops when props are undefined
+  // because creating new [] on every render triggers useEffect.
+  const initialSongs = useMemo(() => Array.isArray(propInitialSongs) ? propInitialSongs : [], [propInitialSongs]);
+  const initialGenres = useMemo(() => Array.isArray(propInitialGenres) ? propInitialGenres : [], [propInitialGenres]);
 
   const [songs, setSongs] = useState<Song[]>(initialSongs);
-  const [genres, setGenres] = useState<Genre[]>(initialGenres); // Fix: genres needed setter
+  const [genres, setGenres] = useState<Genre[]>(initialGenres);
   const router = useRouter();
 
   // Update state when initial props change (e.g. after router.refresh())

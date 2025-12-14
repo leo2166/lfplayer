@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils"
 import AddMusicDialog from "@/components/add-music-dialog"
 import { useUserRole, useSetUserRole } from "@/contexts/UserRoleContext"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
-import { MusicLibraryProvider } from "@/contexts/MusicLibraryContext" // NEW IMPORT
 import { usePWAInstall } from "@/hooks/usePWAInstall" // Import the PWA install hook
 
 export default function ClientLayout({
@@ -45,7 +44,7 @@ export default function ClientLayout({
       subscription.unsubscribe()
     }
   }, [supabase, router])
-  
+
   const navItems = [
     {
       label: "Mi Música",
@@ -63,8 +62,8 @@ export default function ClientLayout({
     setAddMusicOpen(false)
     // Add a small delay to give Next.js cache more time to revalidate
     setTimeout(() => {
-      router.refresh() 
-    }, 100); 
+      router.refresh()
+    }, 100);
   }
 
   const handleSignOut = async () => {
@@ -191,9 +190,7 @@ export default function ClientLayout({
           </header>
 
           {/* Page Content */}
-          <MusicLibraryProvider>
-            <main className="flex-1 overflow-y-auto">{children}</main>
-          </MusicLibraryProvider>
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
 
         {/* PWA Install Button */}
