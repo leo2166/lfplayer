@@ -133,6 +133,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     const allSavedSongs: any[] = [];
     let processedFileCount = 0;
     let anErrorOccurred = false;
+    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
     for (const file of files) {
       const currentFileName = file.name;
@@ -218,6 +219,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
         setUploadProgress(progress);
       }
+      
+      await delay(500); // Wait 500ms before starting the next file
     }
     
     if (!anErrorOccurred) {
