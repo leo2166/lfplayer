@@ -132,109 +132,99 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
     const allSavedSongs: any[] = [];
     let processedFileCount = 0;
+    let anErrorOccurred = false;
 
-    try { // Outer try-catch to stop the entire process
-      for (const file of files) {
-        const currentFileName = file.name;
+    for (const file of files) {
+      const currentFileName = file.name;
 
-        try { // Inner try-catch for individual file processing
-          log(`[${currentFileName}] Iniciando proceso...`);
-          
-          if (!file.name.toLowerCase().endsWith(".mp3")) throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
-          if (!genre_id) throw new Error("Género no seleccionado.");
-          if (!artistNameInput.trim()) throw new Error("Artista no especificado.");
+      try {
+        log(`[${currentFileName}] Iniciando proceso...`);
+        
+        if (!file.name.toLowerCase().endsWith(".mp3")) throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
+        if (!genre_id) throw new Error("Género no seleccionado.");
+        if (!artistNameInput.trim()) throw new Error("Artista no especificado.");
 
-          // 1. Get Presigned URL
-          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1/4: Obteniendo URL firmada', 'text-purple-600');
-          log(`[${currentFileName}] Solicitando URL firmada...`);
-          const presignResponse = await fetch("/api/upload", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
-          });
-          if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
-          const { url, downloadUrl } = await presignResponse.json();
-          log(`[${currentFileName}] URL obtenida.`);
+        updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1/4: Obteniendo URL firmada', 'text-purple-600');
+        log(`[${currentFileName}] Solicitando URL firmada...`);
+        const presignResponse = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
+        });
+        if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
+        const { url, downloadUrl } = await presignResponse.json();
+        log(`[${currentFileName}] URL obtenida.`);
 
-          // 2. Upload to R2
-          updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
-          log(`[${currentFileName}] Subiendo a R2...`);
-          const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-          if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
-          log(`[${currentFileName}] Subida a R2 exitosa.`);
-          
-          // 3. Get Duration
-          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3/4: Obteniendo metadatos', 'text-blue-600');
-          log(`[${currentFileName}] Obteniendo duración...`);
-          const audio = new Audio(downloadUrl);
-          const duration = await new Promise<number>((resolve) => {
-            audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
-            audio.onerror = () => {
-              log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos. Duración será 0.`);
-              resolve(0);
-            }
-          });
-          log(`[${currentFileName}] Duración: ${duration}s`);
-          
-          const songData = {
-            title: currentFileName.replace(/\.mp3$/i, ""),
-            artist: artistNameInput.trim(),
-            genre_id,
-            blob_url: downloadUrl,
-            duration,
-          };
-          
-          // 4. Save to DB
-          updateStatus(currentFileName, 'Guardando en DB...', 'Paso 4/4: Registrando canción en DB', 'text-blue-600');
-          log(`[${currentFileName}] Guardando en DB...`);
-          const saveRes = await fetch("/api/songs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(songData),
-          });
-          
-          // 5. VERIFICATION
-          const savedSongResponse = await saveRes.json();
-          if (!saveRes.ok || !savedSongResponse.songs || savedSongResponse.songs.length === 0) {
-            log(`[${currentFileName}] ¡VERIFICACIÓN FALLIDA! La DB no devolvió la canción guardada.`);
-            log(`[${currentFileName}] Iniciando limpieza: eliminando archivo huérfano de R2...`);
-            await fetch("/api/songs", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ blob_url: downloadUrl }),
-            });
-            log(`[${currentFileName}] Limpieza completada.`);
-            throw new Error(savedSongResponse.error || "Verificación fallida: DB no registró la canción.");
+        updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
+        log(`[${currentFileName}] Subiendo a R2...`);
+        const uploadResponse = await fetch(url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        if (!uploadResponse.ok) throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
+        log(`[${currentFileName}] Subida a R2 exitosa.`);
+        
+        updateStatus(currentFileName, 'Guardando en DB...', 'Paso 3/4: Obteniendo metadatos', 'text-blue-600');
+        log(`[${currentFileName}] Obteniendo duración...`);
+        const audio = new Audio(downloadUrl);
+        const duration = await new Promise<number>((resolve) => {
+          audio.onloadedmetadata = () => resolve(Math.floor(audio.duration));
+          audio.onerror = () => {
+            log(`[${currentFileName}] ADVERTENCIA: No se pudo cargar metadatos. Duración será 0.`);
+            resolve(0);
           }
-          
-          allSavedSongs.push(savedSongResponse.songs[0]);
-          log(`[${currentFileName}] ÉXITO: Verificación completada.`);
-          updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
-
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
-          log(`[${currentFileName}] FALLO: ${reason}`);
-          updateStatus(currentFileName, 'Error', reason, 'text-red-600');
-          throw err; // Re-throw to be caught by the outer catch, stopping the process
-        } finally {
-          processedFileCount++;
-          const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
-          setUploadProgress(progress);
+        });
+        log(`[${currentFileName}] Duración: ${duration}s`);
+        
+        const songData = {
+          title: currentFileName.replace(/\.mp3$/i, ""),
+          artist: artistNameInput.trim(),
+          genre_id,
+          blob_url: downloadUrl,
+          duration,
+        };
+        
+        updateStatus(currentFileName, 'Guardando en DB...', 'Paso 4/4: Registrando canción en DB', 'text-blue-600');
+        log(`[${currentFileName}] Guardando en DB...`);
+        const saveRes = await fetch("/api/songs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(songData),
+        });
+        
+        const savedSongResponse = await saveRes.json();
+        if (!saveRes.ok || !savedSongResponse.songs || savedSongResponse.songs.length === 0) {
+          log(`[${currentFileName}] ¡VERIFICACIÓN FALLIDA! La DB no devolvió la canción guardada.`);
+          log(`[${currentFileName}] Iniciando limpieza: eliminando archivo huérfano de R2...`);
+          await fetch("/api/songs", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ blob_url: downloadUrl }),
+          });
+          log(`[${currentFileName}] Limpieza completada.`);
+          throw new Error(savedSongResponse.error || "Verificación fallida: DB no registró la canción.");
         }
+        
+        allSavedSongs.push(savedSongResponse.songs[0]);
+        log(`[${currentFileName}] ÉXITO: Verificación completada.`);
+        updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
+
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "Ocurrió un error desconocido";
+        log(`[${currentFileName}] FALLO: ${reason}. DETENIENDO PROCESO.`);
+        updateStatus(currentFileName, 'Error', reason, 'text-red-600');
+        setError(`El proceso se detuvo por un error en '${currentFileName}'. Revisa el registro.`);
+        anErrorOccurred = true;
+        break; // Stop the loop immediately
+      } finally {
+        processedFileCount++;
+        const progress = files.length > 0 ? (processedFileCount / files.length) * 100 : 100;
+        setUploadProgress(progress);
       }
-      onUploadSuccess?.(allSavedSongs);
-      
-    } catch (finalError) {
-      console.error("Proceso de subida detenido por un error:", finalError);
-      setError(`El proceso se detuvo debido a un error en el archivo: ${(finalError as any).fileName || files[processedFileCount]?.name || 'desconocido'}. Detalles en el registro.`);
-    } finally {
-      setIsLoading(false);
-      // No auto-resetting here to allow user to see the logs
-      // setTimeout(() => {
-      //   resetState();
-      //   setUploadProgress(0);
-      // }, 30000); 
     }
+    
+    if (!anErrorOccurred) {
+      onUploadSuccess?.(allSavedSongs);
+    }
+    
+    setIsLoading(false);
   }
 
   return (
