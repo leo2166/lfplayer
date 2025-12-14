@@ -6,7 +6,9 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 // Helper function to find broken links
-async function findBrokenSupabaseRecords() {
+async function findBrokenSupabaseRecords(userId: string) {
+    console.log(`[BROKEN LINKS] Starting broken links check for user: ${userId}`);
+
     // 1. Get all file keys from Cloudflare R2
     let isTruncated = true;
     let continuationToken: string | undefined = undefined;
@@ -14,14 +16,14 @@ async function findBrokenSupabaseRecords() {
     const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
 
     while (isTruncated) {
-        const { Contents, IsTruncated, NextContinuationToken } = await r2.send(
+        const { Contents, IsTruncated, NextContinuationToken }: any = await r2.send(
             new ListObjectsV2Command({
                 Bucket: bucketName,
                 ContinuationToken: continuationToken,
             })
         );
         if (Contents) {
-            Contents.forEach((item) => {
+            Contents.forEach((item: any) => {
                 if (item.Key) r2FileKeys.add(item.Key);
             });
         }
@@ -29,14 +31,19 @@ async function findBrokenSupabaseRecords() {
         continuationToken = NextContinuationToken;
     }
 
-    // 2. Get all songs from Supabase
+    console.log(`[BROKEN LINKS] Total files in R2: ${r2FileKeys.size}`);
+
+    // 2. Get songs ONLY from the current user
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
-        .select('id, title, artist, blob_url');
-        
+        .select('id, title, artist, blob_url')
+        .eq('user_id', userId);
+
     if (dbError) {
         throw new Error(`Error de base de datos: ${dbError.message}`);
     }
+
+    console.log(`[BROKEN LINKS] Total songs for user ${userId}: ${songs.length}`);
 
     const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
     if (!r2PublicUrl) {
@@ -47,14 +54,20 @@ async function findBrokenSupabaseRecords() {
     const brokenRecords = songs.filter(song => {
         if (!song.blob_url || !song.blob_url.startsWith(r2PublicUrl)) {
             // Include records with invalid or missing blob_urls as broken
+            console.log(`[BROKEN LINKS] Found broken record (invalid URL): ${song.title} by ${song.artist}`);
             return true;
         }
         let key = song.blob_url.substring(r2PublicUrl.length);
         const finalKey = key.startsWith('/') ? key.substring(1) : key;
-        
-        return !r2FileKeys.has(finalKey);
+
+        const isBroken = !r2FileKeys.has(finalKey);
+        if (isBroken) {
+            console.log(`[BROKEN LINKS] Found broken record (missing file): ${song.title} by ${song.artist} - Key: ${finalKey}`);
+        }
+        return isBroken;
     });
 
+    console.log(`[BROKEN LINKS] Total broken records found: ${brokenRecords.length}`);
     return {
         brokenRecords,
         totalR2Files: r2FileKeys.size,
@@ -65,31 +78,31 @@ async function findBrokenSupabaseRecords() {
 
 // GET handler to find and return broken links
 export async function GET(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    if (profileError || !profile || profile.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
+        const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        if (profileError || !profile || profile.role !== "admin") {
+            return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
+        }
+
+        const { brokenRecords, totalR2Files, totalSupabaseSongs } = await findBrokenSupabaseRecords(user.id);
+
+        return NextResponse.json({
+            message: 'Análisis de registros rotos completado.',
+            totalR2Files,
+            totalSupabaseSongs,
+            brokenRecordCount: brokenRecords.length,
+            brokenRecords,
+        });
+
+    } catch (error) {
+        console.error('Error en GET /api/cleanup-supabase/broken-links:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Un error inesperado ocurrió.';
+        return NextResponse.json({ error: `Error interno del servidor: ${errorMessage}` }, { status: 500 });
     }
-
-    const { brokenRecords, totalR2Files, totalSupabaseSongs } = await findBrokenSupabaseRecords();
-
-    return NextResponse.json({
-      message: 'Análisis de registros rotos completado.',
-      totalR2Files,
-      totalSupabaseSongs,
-      brokenRecordCount: brokenRecords.length,
-      brokenRecords,
-    });
-
-  } catch (error) {
-    console.error('Error en GET /api/cleanup-supabase/broken-links:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Un error inesperado ocurrió.';
-    return NextResponse.json({ error: `Error interno del servidor: ${errorMessage}` }, { status: 500 });
-  }
 }
 
 // DELETE handler to remove broken links
@@ -104,12 +117,12 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
         }
 
-        const { brokenRecords } = await findBrokenSupabaseRecords();
+        const { brokenRecords } = await findBrokenSupabaseRecords(user.id);
 
         if (brokenRecords.length === 0) {
             return NextResponse.json({ message: "No se encontraron registros rotos para eliminar." });
         }
-        
+
         const idsToDelete = brokenRecords.map(record => record.id);
 
         const { error: deleteError } = await supabaseAdmin
