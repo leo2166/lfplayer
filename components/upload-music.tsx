@@ -158,12 +158,14 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
         log(`[${currentFileName}] Subiendo a R2...`);
+        log(`[${currentFileName}] Tamaño del archivo: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
 
         // Upload with timeout
         const uploadController = new AbortController();
         const uploadTimeout = setTimeout(() => uploadController.abort(), 60000); // 60s timeout
 
         try {
+          const uploadStartTime = Date.now();
           const uploadResponse = await fetch(url, {
             method: "PUT",
             body: file,
@@ -171,19 +173,38 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             signal: uploadController.signal
           });
           clearTimeout(uploadTimeout);
+          const uploadDuration = ((Date.now() - uploadStartTime) / 1000).toFixed(2);
+
+          log(`[${currentFileName}] Upload response status: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          log(`[${currentFileName}] Upload duration: ${uploadDuration}s`);
+          log(`[${currentFileName}] Content-Length header: ${uploadResponse.headers.get('content-length') || 'N/A'}`);
+          log(`[${currentFileName}] ETag header: ${uploadResponse.headers.get('etag') || 'N/A'}`);
 
           if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text().catch(() => 'No error text');
+            log(`[${currentFileName}] ERROR RESPONSE BODY: ${errorText}`);
             throw new Error(`Error al subir archivo a R2 (${uploadResponse.status})`);
           }
-          log(`[${currentFileName}] Subida a R2 completada (status ${uploadResponse.status}).`);
+          log(`[${currentFileName}] ✓ Subida a R2 completada (status ${uploadResponse.status}).`);
 
-          // VERIFICAR que el archivo realmente existe en R2
-          log(`[${currentFileName}] Verificando existencia en R2...`);
+          // VERIFICACIÓN #1: HEAD request
+          log(`[${currentFileName}] Verificación #1: HEAD request a R2...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before verifying
           const verifyResponse = await fetch(downloadUrl, { method: "HEAD" });
+          log(`[${currentFileName}] HEAD response status: ${verifyResponse.status}`);
+          log(`[${currentFileName}] HEAD Content-Length: ${verifyResponse.headers.get('content-length') || 'N/A'}`);
+          log(`[${currentFileName}] HEAD Content-Type: ${verifyResponse.headers.get('content-type') || 'N/A'}`);
+
           if (!verifyResponse.ok) {
-            throw new Error(`Archivo no encontrado en R2 después de subir (${verifyResponse.status})`);
+            throw new Error(`Archivo no encontrado en R2 después de subir (HEAD ${verifyResponse.status})`);
           }
-          log(`[${currentFileName}] Verificación R2 exitosa.`);
+
+          const contentLength = verifyResponse.headers.get('content-length');
+          if (contentLength && parseInt(contentLength) !== file.size) {
+            log(`[${currentFileName}] ⚠️ ADVERTENCIA: Tamaño no coincide! Esperado: ${file.size}, Recibido: ${contentLength}`);
+          } else {
+            log(`[${currentFileName}] ✓ Verificación HEAD exitosa, tamaño correcto.`);
+          }
 
         } catch (uploadError) {
           clearTimeout(uploadTimeout);
@@ -258,7 +279,33 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         }
 
         allSavedSongs.push(savedSongResponse.songs[0]);
-        log(`[${currentFileName}] ÉXITO: Verificación completada.`);
+        log(`[${currentFileName}] ✓ Canción registrada en DB con ID: ${savedSongResponse.songs[0].id}`);
+
+        // VERIFICACIÓN FINAL: Confirmar que el enlace completo funciona
+        log(`[${currentFileName}] Verificación FINAL: Probando blob_url guardado...`);
+        const finalBlobUrl = savedSongResponse.songs[0].blob_url;
+
+        if (finalBlobUrl !== downloadUrl) {
+          log(`[${currentFileName}] ⚠️ ADVERTENCIA: blob_url guardado difiere del original!`);
+          log(`[${currentFileName}]   Esperado: ${downloadUrl}`);
+          log(`[${currentFileName}]   Guardado: ${finalBlobUrl}`);
+        }
+
+        // Verificar que el blob_url guardado sea accesible
+        const finalVerifyResponse = await fetch(finalBlobUrl, { method: "HEAD" });
+        if (!finalVerifyResponse.ok) {
+          log(`[${currentFileName}] ❌ ERROR CRÍTICO: blob_url guardado NO es accesible (${finalVerifyResponse.status})`);
+          throw new Error(`Verificación final fallida: blob_url no funciona (${finalVerifyResponse.status})`);
+        }
+
+        const finalContentLength = finalVerifyResponse.headers.get('content-length');
+        if (finalContentLength && parseInt(finalContentLength) === file.size) {
+          log(`[${currentFileName}] ✓ Verificación FINAL exitosa: blob_url funciona, tamaño correcto (${finalContentLength} bytes)`);
+        } else {
+          log(`[${currentFileName}] ⚠️ Verificación final con advertencia: tamaño ${finalContentLength} vs esperado ${file.size}`);
+        }
+
+        log(`[${currentFileName}] ✅ ÉXITO COMPLETO: Canción 100% verificada y lista para reproducción.`);
         updateStatus(currentFileName, 'Éxito', 'La canción fue procesada correctamente.', 'text-green-600');
 
       } catch (err) {
@@ -277,7 +324,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       await delay(2000); // Wait 2 seconds before starting the next file
     }
 
-    if (!anErrorOccurred) {
+    // Refresh the UI if at least one song was uploaded successfully
+    if (allSavedSongs.length > 0) {
+      log(`📱 Refrescando frontend con ${allSavedSongs.length} nuevas canciones...`);
       onUploadSuccess?.(allSavedSongs);
     }
 
@@ -398,7 +447,20 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         {debugLog.length > 0 && (
           <div className="space-y-2 pt-4">
-            <h4 className="font-semibold text-sm">Registro de Diagnóstico Detallado</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">Registro de Diagnóstico Detallado ({debugLog.length} entradas)</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDebugLog([]);
+                  setUploadStatuses([]);
+                }}
+              >
+                Limpiar Logs
+              </Button>
+            </div>
             <div className="max-h-64 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
               {debugLog.map((msg, index) => (
                 <p key={index} className="whitespace-pre-wrap break-words">{msg}</p>
