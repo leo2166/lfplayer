@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Music, Menu, X, ListMusic, PlusCircle, Download, LogOut } from "lucide-react"
@@ -22,28 +22,17 @@ export default function ClientLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { closePlayer } = useMusicPlayer()
-  const [supabase] = useState(() => createBrowserClient(
+  const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ))
+  )
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAddMusicOpen, setAddMusicOpen] = useState(false)
   const { canInstall, handleInstall } = usePWAInstall() // Use the PWA install hook
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
-        // Refresh the page to let the server re-evaluate the user role
-        router.refresh();
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase, router])
+  // REMOVED: onAuthStateChange subscription.
+  // We rely on Middleware for redirect protection.
+  // This prevents infinite re-render loops caused by router.refresh() on every auth event.
 
   const navItems = [
     {
