@@ -25,12 +25,12 @@ async function main() {
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
 
-    // Get songs uploaded in the last 2 hours (adjust as needed)
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    // Get songs uploaded in the last 24 hours
+    const twoHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: songs, error } = await supabase
         .from('songs')
-        .select('title, artist, created_at')
+        .select('title, artist, created_at, blob_url')
         .gte('created_at', twoHoursAgo)
         .order('created_at', { ascending: false });
 
@@ -39,9 +39,9 @@ async function main() {
         return;
     }
 
-    console.log(`\n--- LISTA DE 27 ARCHIVOS SUBIDOS (${songs.length}) ---`);
+    console.log(`\n--- LISTA DE ARCHIVOS RECIENTES (${songs.length}) ---`);
     const sorted = songs.sort((a, b) => a.title.localeCompare(b.title));
-    sorted.forEach((s, i) => console.log(`${i + 1}. ${s.title}`));
+    sorted.forEach((s, i) => console.log(`${i + 1}. ${s.title}\n   URL: ${s.blob_url}`));
 }
 
 main();

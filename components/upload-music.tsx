@@ -28,9 +28,26 @@ interface UploadMusicProps {
 
 interface UploadStatus {
   fileName: string;
-  status: 'Pendiente' | 'Subiendo a R2...' | 'Guardando en DB...' | 'Éxito' | 'Error';
+  status: 'Pendiente' | 'Subiendo a R2...' | 'Guardando en DB...' | 'Éxito' | 'Error' | 'Duplicado';
   message: string;
-  color: 'text-muted-foreground' | 'text-purple-600' | 'text-blue-600' | 'text-green-600' | 'text-red-600';
+  color: 'text-muted-foreground' | 'text-purple-600' | 'text-blue-600' | 'text-green-600' | 'text-red-600' | 'text-yellow-600';
+}
+
+// ... inside component ...
+
+// Handle duplicate detection (409 status)
+if (saveRes.status === 409) {
+  log(`[${currentFileName}] DUPLICADO DETECTADO: Esta canción ya existe en la biblioteca.`);
+  log(`[${currentFileName}] Iniciando limpieza del archivo duplicado en R2...`);
+  await fetch("/api/cleanup", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blob_url: downloadUrl }),
+  });
+  log(`[${currentFileName}] Limpieza completada.`);
+
+  updateStatus(currentFileName, 'Duplicado', 'Ya existe en la biblioteca (Saltada).', 'text-yellow-600');
+  continue; // Skip this file and continue with the next one
 }
 
 export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist, preselectedGenreId }: UploadMusicProps) {
@@ -278,7 +295,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             body: JSON.stringify({ blob_url: downloadUrl }),
           });
           log(`[${currentFileName}] Limpieza completada.`);
-          throw new Error("Esta canción ya existe en tu biblioteca. No se permiten duplicados.");
+
+          updateStatus(currentFileName, 'Duplicado', 'Ya existe en la biblioteca (Saltada).', 'text-yellow-600');
+          continue; // Skip without throwing error
         }
 
         if (!saveRes.ok || !savedSongResponse.songs || savedSongResponse.songs.length === 0) {
@@ -475,6 +494,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                     {s.status === 'Guardando en DB...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
                     {s.status === 'Éxito' && <CheckCircle2 className={cn("w-4 h-4", s.color)} />}
                     {s.status === 'Error' && <XCircle className={cn("w-4 h-4", s.color)} />}
+                    {s.status === 'Duplicado' && <AlertCircle className={cn("w-4 h-4", s.color)} />}
                   </div>
                   <div className="flex-1 truncate">
                     <p className="font-medium truncate" title={s.fileName}>{s.fileName}</p>

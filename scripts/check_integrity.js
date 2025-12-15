@@ -111,9 +111,28 @@ async function main() {
     });
 
     r2Files.forEach(key => {
-        if (!supabaseFileKeys.has(key)) {
-            orphans.push(key);
+        // 1. Exact match
+        if (supabaseFileKeys.has(key)) return;
+
+        // 2. Try URL-decoded match (Key in R2 is encoded, DB has it decoded)
+        // OR Key in R2 is decoded, DB has it "slightly" different equivalent
+        const keyDecoded = decodeURIComponent(key);
+        if (supabaseFileKeys.has(keyDecoded)) return;
+
+        // 3. Reverse check: Iterate DB keys and check if they decode to this key
+        // (Expensive but necessary for verification script)
+        let found = false;
+        for (const dbKey of supabaseFileKeys) {
+            try {
+                if (decodeURIComponent(dbKey) === keyDecoded) {
+                    found = true;
+                    break;
+                }
+            } catch (e) { }
         }
+        if (found) return;
+
+        orphans.push(key);
     });
 
     // 6. Report
