@@ -531,7 +531,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           disabled={isLoading} // Only disabled when loading, always clickable otherwise
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-        >
           {isLoading ? `Procesando...` : `Confirmar y Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
       </form>
