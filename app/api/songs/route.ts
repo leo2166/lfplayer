@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       songsToInsert.map(song =>
         supabase
           .from("songs")
-          .select("id, title, artist")
+          .select("id, title, artist, created_at, genres(name)")
           .eq("user_id", user.id)
           .eq("title", song.title)
           .eq("artist", song.artist)
@@ -113,11 +113,21 @@ export async function POST(request: NextRequest) {
       .filter(({ result }) => result.data !== null)
 
     if (duplicates.length > 0) {
-      const duplicateNames = duplicates.map(d => `"${d.song.title}" por ${d.song.artist}`)
+      const duplicateNames = duplicates.map(d => {
+        const existing = d.result.data;
+        const genreName = existing?.genres ? (Array.isArray(existing.genres) ? existing.genres[0]?.name : existing.genres.name) : 'Desconocido';
+        const date = existing?.created_at ? new Date(existing.created_at).toLocaleDateString() : 'N/A';
+        return `"${d.song.title}" (Género: ${genreName}, Subido: ${date})`;
+      })
       console.log("Duplicates detected:", duplicateNames)
       return NextResponse.json({
         error: `Las siguientes canciones ya existen en tu biblioteca: ${duplicateNames.join(", ")}`,
-        duplicates: duplicateNames
+        duplicates: duplicateNames,
+        details: duplicates.map(d => ({
+          title: d.song.title,
+          genre: d.result.data?.genres ? (Array.isArray(d.result.data.genres) ? d.result.data.genres[0]?.name : d.result.data.genres.name) : 'Desconocido',
+          created_at: d.result.data?.created_at
+        }))
       }, { status: 409 })
     }
 

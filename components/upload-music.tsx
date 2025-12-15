@@ -275,6 +275,26 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         // Handle duplicate detection (409 status)
         if (saveRes.status === 409) {
           log(`[${currentFileName}] DUPLICADO DETECTADO: Esta canción ya existe en la biblioteca.`);
+
+          let detailsMsg = 'Ya existe en la biblioteca (Saltada).';
+          try {
+            // We need to parse the response body AGAIN because previously we only did saveRes.json() for success flow
+            // Wait, we can't parse it twice. But wait, checking the code, savedSongResponse IS parsed early IF ok.
+            // But if status is 409, saveRes.ok is false.
+            // So we must parse it here.
+            const errorData = await extractErrorData(saveRes); // Helper needed? No, just use savedSongResponse variable which was parsed earlier?
+            // Ah, look at line 286: const savedSongResponse = await saveRes.json();
+            // It's ALREADY parsed. We can use `savedSongResponse`.
+
+            if (savedSongResponse.details && savedSongResponse.details.length > 0) {
+              const d = savedSongResponse.details[0];
+              const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString() : '';
+              detailsMsg = `Duplicado en género: ${d.genre} (${dateStr})`;
+            }
+          } catch (e) {
+            log(`[${currentFileName}] Error al parsear detalles del duplicado: ${e}`);
+          }
+
           log(`[${currentFileName}] Iniciando limpieza del archivo duplicado en R2...`);
           await fetch("/api/cleanup", {
             method: "DELETE",
@@ -283,7 +303,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           });
           log(`[${currentFileName}] Limpieza completada.`);
 
-          updateStatus(currentFileName, 'Duplicado', 'Ya existe en la biblioteca (Saltada).', 'text-yellow-600');
+          updateStatus(currentFileName, 'Duplicado', detailsMsg, 'text-yellow-600');
           continue; // Skip without throwing error
         }
 
