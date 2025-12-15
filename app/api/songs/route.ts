@@ -36,6 +36,10 @@ export async function GET(request: NextRequest) {
       query = query.eq("genre_id", genre_id)
     }
 
+    // FIX: Supabase defaults to 1000 rows. We increase this range to prevent older songs from "disappearing".
+    // 10,000 should be sufficient for the current scale.
+    query = query.range(0, 10000);
+
     const { data, error } = await query
 
     if (error) throw error
