@@ -346,10 +346,20 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             <Input id="artistName" value={artistNameInput} className="mt-1" disabled />
           </div>
         ) : (
-          uploadMode === 'folder' && artistNameInput &&
-          <div className="space-y-1">
-            <Label>Carpeta a subir (artista):</Label>
-            <p className="font-bold text-green-600 text-lg">{artistNameInput}</p>
+          <div>
+            <Label htmlFor="artistName">Nombre del Artista *</Label>
+            <Input
+              id="artistName"
+              value={artistNameInput}
+              onChange={(e) => setArtistNameInput(e.target.value)}
+              placeholder="Escribe el nombre del artista"
+              className="mt-1"
+            />
+            {uploadMode === 'folder' && artistNameInput && (
+              <p className="text-xs text-green-600 mt-1 font-medium">
+                Detectado desde carpeta: {artistNameInput}
+              </p>
+            )}
           </div>
         )}
 
@@ -373,7 +383,16 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           <Label htmlFor={uploadMode === 'files' ? "file-upload" : "folder-upload"}>{uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}</Label>
           <div className="hidden">
             <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple disabled={isLoading} />
-            <Input id="folder-upload" type="file" ref={folderInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple webkitdirectory="" disabled={isLoading} />
+            <Input
+              id="folder-upload"
+              type="file"
+              ref={folderInputRef}
+              onChange={handleFileChange}
+              accept=".mp3,audio/mpeg"
+              multiple
+              {...({ webkitdirectory: "" } as any)}
+              disabled={isLoading}
+            />
           </div>
           <div className="mt-2 grid grid-cols-1 gap-2">
             {uploadMode === 'files' ? (
