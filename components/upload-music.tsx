@@ -35,20 +35,7 @@ interface UploadStatus {
 
 // ... inside component ...
 
-// Handle duplicate detection (409 status)
-if (saveRes.status === 409) {
-  log(`[${currentFileName}] DUPLICADO DETECTADO: Esta canción ya existe en la biblioteca.`);
-  log(`[${currentFileName}] Iniciando limpieza del archivo duplicado en R2...`);
-  await fetch("/api/cleanup", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ blob_url: downloadUrl }),
-  });
-  log(`[${currentFileName}] Limpieza completada.`);
 
-  updateStatus(currentFileName, 'Duplicado', 'Ya existe en la biblioteca (Saltada).', 'text-yellow-600');
-  continue; // Skip this file and continue with the next one
-}
 
 export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist, preselectedGenreId }: UploadMusicProps) {
   const [genre_id, setGenreId] = useState(preselectedGenreId || "")
