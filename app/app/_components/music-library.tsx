@@ -66,6 +66,11 @@ export default function MusicLibrary() { // Props removed
   const [showOrphanResult, setShowOrphanResult] = useState(false);
   const [orphanResult, setOrphanResult] = useState<any>(null);
 
+  // State for rectify
+  const [isRectifying, setIsRectifying] = useState(false);
+  const [showRectifySuccess, setShowRectifySuccess] = useState(false);
+  const [rectifyResult, setRectifyResult] = useState<any>(null);
+
   // State for orphan file deletion
   const [isDeletingOrphans, setIsDeletingOrphans] = useState(false);
   const [showOrphanDeleteConfirm, setShowOrphanDeleteConfirm] = useState(false);
