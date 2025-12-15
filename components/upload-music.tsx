@@ -48,6 +48,9 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   const [uploadMode, setUploadMode] = useState<'files' | 'folder'>(preselectedArtist ? 'files' : 'folder');
   const [artistNameInput, setArtistNameInput] = useState(preselectedArtist || "");
 
+  /* NEW STATES */
+  const [uploadStats, setUploadStats] = useState<{ total: number; valid: number; ignored: number } | null>(null);
+
   useEffect(() => {
     if (preselectedArtist) {
       setArtistNameInput(preselectedArtist);
@@ -63,6 +66,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
   const resetState = () => {
     setFiles([]);
+    setUploadStats(null); // Reset stats
     setError(null);
     setUploadStatuses([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -79,19 +83,32 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // First, capture the files from the event.
-    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    const allFiles = e.target.files ? Array.from(e.target.files) : [];
 
-    // Manually reset UI states from previous uploads without clearing the input field yet.
+    // Manually reset UI states from previous uploads.
     setError(null);
     setUploadStatuses([]);
 
-    // Now, update the component's state with the new files.
-    setFiles(selectedFiles);
+    // FILTER LOGIC
+    const validFiles = allFiles.filter(f =>
+      f.type === 'audio/mpeg' || f.name.toLowerCase().endsWith('.mp3')
+    );
+    const ignoredCount = allFiles.length - validFiles.length;
+
+    // Update stats
+    setUploadStats({
+      total: allFiles.length,
+      valid: validFiles.length,
+      ignored: ignoredCount
+    });
+
+    // Update component's state with ONLY valid files.
+    setFiles(validFiles);
 
     // If folder upload, automatically extract artist name from the relative path.
     if (uploadMode === 'folder') {
-      if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
-        const artistName = selectedFiles[0].webkitRelativePath.split('/')[0];
+      if (validFiles.length > 0 && validFiles[0].webkitRelativePath) {
+        const artistName = validFiles[0].webkitRelativePath.split('/')[0];
         if (artistName) {
           setArtistNameInput(artistName);
         }
@@ -102,7 +119,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     }
 
     // It's important to clear the input value to allow selecting the same file(s) again.
-    // The event target is the specific input that was used.
     e.target.value = '';
   };
 
@@ -406,9 +422,32 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             )}
           </div>
 
-          {files.length > 0 && (
-            <div className="text-sm text-muted-foreground mt-2 space-y-1 bg-accent/50 p-3 rounded-lg">
-              <p className="font-bold text-purple-600">{files.length} archivos seleccionados.</p>
+          {uploadStats && (
+            <div className="mt-4 p-4 rounded-lg bg-secondary/50 border border-border space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-primary" />
+                Resumen de Selección
+              </h4>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="bg-background rounded p-2 border border-border">
+                  <p className="text-muted-foreground text-xs">Total</p>
+                  <p className="font-bold text-lg">{uploadStats.total}</p>
+                </div>
+                <div className="bg-background rounded p-2 border border-border">
+                  <p className="text-green-600 text-xs font-medium">MP3 Válidos</p>
+                  <p className="font-bold text-lg text-green-600">{uploadStats.valid}</p>
+                </div>
+                <div className="bg-background rounded p-2 border border-border">
+                  <p className="text-yellow-600 text-xs font-medium">Ignorados</p>
+                  <p className="font-bold text-lg text-yellow-600">{uploadStats.ignored}</p>
+                </div>
+              </div>
+              {uploadStats.ignored > 0 && (
+                <p className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded flex items-center gap-2">
+                  <AlertCircle className="w-3 h-3" />
+                  Se ignorarán {uploadStats.ignored} archivos que no son MP3.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -492,7 +531,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           disabled={isLoading} // Only disabled when loading, always clickable otherwise
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
         >
-          {isLoading ? `Procesando...` : `Subir ${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`}
+        >
+          {isLoading ? `Procesando...` : `Confirmar y Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
       </form>
     </div>
