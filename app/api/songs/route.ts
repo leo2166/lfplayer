@@ -115,7 +115,11 @@ export async function POST(request: NextRequest) {
     if (duplicates.length > 0) {
       const duplicateNames = duplicates.map(d => {
         const existing = d.result.data;
-        const genreName = existing?.genres ? (Array.isArray(existing.genres) ? existing.genres[0]?.name : existing.genres.name) : 'Desconocido';
+        let genreName = 'Desconocido';
+        const g = existing?.genres as any; // Cast to any to bypass TS inference issue on the join
+        if (g) {
+          genreName = Array.isArray(g) ? g[0]?.name : g.name;
+        }
         const date = existing?.created_at ? new Date(existing.created_at).toLocaleDateString() : 'N/A';
         return `"${d.song.title}" (Género: ${genreName}, Subido: ${date})`;
       })
@@ -123,11 +127,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: `Las siguientes canciones ya existen en tu biblioteca: ${duplicateNames.join(", ")}`,
         duplicates: duplicateNames,
-        details: duplicates.map(d => ({
-          title: d.song.title,
-          genre: d.result.data?.genres ? (Array.isArray(d.result.data.genres) ? d.result.data.genres[0]?.name : d.result.data.genres.name) : 'Desconocido',
-          created_at: d.result.data?.created_at
-        }))
+        details: duplicates.map(d => {
+          const g = d.result.data?.genres as any;
+          const genreName = g ? (Array.isArray(g) ? g[0]?.name : g.name) : 'Desconocido';
+          return {
+            title: d.song.title,
+            genre: genreName,
+            created_at: d.result.data?.created_at
+          };
+        })
       }, { status: 409 })
     }
 
