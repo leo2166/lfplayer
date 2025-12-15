@@ -142,8 +142,8 @@ async function main() {
 
     console.log(`\n[ARCHIVOS HUÉRFANOS] (En R2 pero no en DB): ${orphans.length}`);
     if (orphans.length > 0) {
-        console.log("  Lista completa:");
-        orphans.forEach(o => console.log(`  - ${o}`));
+        console.log("  Lista completa guardada en 'orphans.json'");
+        fs.writeFileSync('orphans.json', JSON.stringify(orphans, null, 2));
     }
 
     console.log(`\n[ENLACES ROTOS] (En DB pero no en R2): ${brokenLinks.length}`);
