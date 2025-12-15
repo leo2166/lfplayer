@@ -169,7 +169,6 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           const uploadResponse = await fetch(url, {
             method: "PUT",
             body: file,
-            headers: { "Content-Type": file.type },
             signal: uploadController.signal
           });
           clearTimeout(uploadTimeout);

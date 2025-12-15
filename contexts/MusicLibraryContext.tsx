@@ -21,28 +21,31 @@ export function MusicLibraryProvider({
   initialSongs: Song[] | undefined;
   initialGenres: Genre[] | undefined;
 }) {
-  // Fix: Use JSON.stringify to compare content, not references.
-  // router.refresh() creates new array references even if data is same.
-  // This prevents infinite loops.
-  const songsHash = JSON.stringify(propInitialSongs || []);
-  const genresHash = JSON.stringify(propInitialGenres || []);
-
   const [songs, setSongs] = useState<Song[]>(Array.isArray(propInitialSongs) ? propInitialSongs : []);
   const [genres, setGenres] = useState<Genre[]>(Array.isArray(propInitialGenres) ? propInitialGenres : []);
   const router = useRouter();
 
   // Update state ONLY when content actually changes
+  // Optimization: Move JSON.stringify inside useEffect to avoid calculation on every render
   useEffect(() => {
     if (propInitialSongs && Array.isArray(propInitialSongs)) {
-      setSongs(propInitialSongs);
+      setSongs(prev => {
+        // Only update if content is different
+        if (JSON.stringify(prev) === JSON.stringify(propInitialSongs)) return prev;
+        return propInitialSongs;
+      });
     }
-  }, [songsHash]); // Depend on the HASH/String, not the array reference
+  }, [propInitialSongs]);
 
   useEffect(() => {
     if (propInitialGenres && Array.isArray(propInitialGenres)) {
-      setGenres(propInitialGenres);
+      setGenres(prev => {
+        // Only update if content is different
+        if (JSON.stringify(prev) === JSON.stringify(propInitialGenres)) return prev;
+        return propInitialGenres;
+      });
     }
-  }, [genresHash]);
+  }, [propInitialGenres]);
 
   const refetchSongs = useCallback(async () => {
     try {

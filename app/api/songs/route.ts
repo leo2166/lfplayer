@@ -48,9 +48,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("--- EJECUTANDO API DE CANCIONES - VERSIÓN TATUAJE 1 ---");
   try {
-    console.log(`\n--- POST /api/songs endpoint hit at: ${new Date().toISOString()} ---`);
     const supabase = await createClient()
     const {
       data: { user },

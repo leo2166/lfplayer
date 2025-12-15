@@ -84,6 +84,7 @@ export default function MusicLibrary() { // Props removed
     setHasMounted(true);
   }, []); // Empty dependency array ensures this runs once.
 
+
   const router = useRouter() // Keep useRouter for general navigation, not for refresh
   const { playSong, currentSong, isPlaying } = useMusicPlayer()
 
@@ -322,12 +323,6 @@ export default function MusicLibrary() { // Props removed
       setIsDeletingBrokenLinks(false);
     }
   };
-
-
-  // State for rectification
-  const [isRectifying, setIsRectifying] = useState(false);
-  const [rectifyResult, setRectifyResult] = useState<any>(null);
-  const [showRectifySuccess, setShowRectifySuccess] = useState(false);
 
   // --- Rectify Orphans Logic ---
   const handleRectifyOrphans = async () => {

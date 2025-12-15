@@ -5,7 +5,6 @@ import { MusicLibraryProvider } from "@/contexts/MusicLibraryContext"
 
 // This page will now fetch data on the server and pass it to a client component.
 export default async function AppPage() {
-  console.log("AppPage (Server): Fetching initial data...");
   const supabase = await createClient()
 
   // Fetch songs and genres in parallel
