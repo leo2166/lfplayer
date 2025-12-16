@@ -418,6 +418,22 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         )}
 
         <div>
+          <Label htmlFor="genre">Género para todas las canciones *</Label>
+          <Select value={genre_id} onValueChange={setGenreId} disabled={isLoading || !!preselectedGenreId}>
+            <SelectTrigger id="genre" className="mt-1">
+              <SelectValue placeholder="Selecciona un género" />
+            </SelectTrigger>
+            <SelectContent>
+              {genres.sort((a, b) => a.name.localeCompare(b.name)).map((genre) => (
+                <SelectItem key={genre.id} value={genre.id}>
+                  {genre.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
           <Label htmlFor={uploadMode === 'files' ? "file-upload" : "folder-upload"}>{uploadMode === 'files' ? "Archivos de Audio para Subir:" : "Carpeta de Audio para Subir:"}</Label>
           <div className="hidden">
             <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} accept=".mp3,audio/mpeg" multiple disabled={isLoading} />
