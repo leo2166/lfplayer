@@ -504,23 +504,30 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
               <Progress value={uploadProgress} className="w-full" />
               <p className="text-xs text-muted-foreground text-center">{Math.round(uploadProgress)}%</p>
             </div>
-            <div className="max-h-60 overflow-y-auto space-y-2 rounded-lg border bg-background p-3">
-              {uploadStatuses.map(s => (
-                <div key={s.fileName} className="flex items-center gap-3 text-sm">
-                  <div>
-                    {s.status === 'Pendiente' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
-                    {s.status === 'Subiendo a R2...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
-                    {s.status === 'Guardando en DB...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
-                    {s.status === 'Éxito' && <CheckCircle2 className={cn("w-4 h-4", s.color)} />}
-                    {s.status === 'Error' && <XCircle className={cn("w-4 h-4", s.color)} />}
-                    {s.status === 'Duplicado' && <AlertCircle className={cn("w-4 h-4", s.color)} />}
-                  </div>
-                  <div className="flex-1 truncate">
-                    <p className="font-medium truncate" title={s.fileName}>{s.fileName}</p>
-                    <p className={cn("text-xs", s.color)}>{s.message}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="h-10 flex items-center rounded-lg border bg-background p-3">
+              {uploadStatuses.length > 0 ? (
+                (() => {
+                  const s = uploadStatuses[uploadStatuses.length - 1]; // Get the last status
+                  return (
+                    <div key={s.fileName} className="flex items-center gap-3 text-sm w-full">
+                      <div>
+                        {s.status === 'Pendiente' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                        {s.status === 'Subiendo a R2...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                        {s.status === 'Guardando en DB...' && <Loader2 className={cn("w-4 h-4 animate-spin", s.color)} />}
+                        {s.status === 'Éxito' && <CheckCircle2 className={cn("w-4 h-4", s.color)} />}
+                        {s.status === 'Error' && <XCircle className={cn("w-4 h-4", s.color)} />}
+                        {s.status === 'Duplicado' && <AlertCircle className={cn("w-4 h-4", s.color)} />}
+                      </div>
+                      <div className="flex-1 truncate">
+                        <p className="font-medium truncate" title={s.fileName}>{s.fileName}</p>
+                        <p className={cn("text-xs", s.color)}>{s.message}</p>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <p className="text-muted-foreground text-sm">Esperando progreso de subida...</p>
+              )}
             </div>
           </div>
         )}
@@ -569,10 +576,14 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 </Button>
               </div>
             </div>
-            <div className="bg-gray-900 text-white font-mono text-xs rounded-lg p-3 h-10 flex items-center">
-              <p className="whitespace-nowrap overflow-hidden truncate">
-                {debugLog.length > 0 ? debugLog[debugLog.length - 1] : 'Esperando último estado...'}
-              </p>
+            <div className="max-h-28 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
+              {debugLog.length > 0 ? (
+                debugLog.map((msg, index) => (
+                  <p key={index} className="whitespace-pre-wrap break-words">{msg}</p>
+                ))
+              ) : (
+                <p className="text-gray-400">Esperando logs...</p>
+              )}
             </div>
           </div>
         )}
