@@ -49,7 +49,7 @@ export function MusicLibraryProvider({
 
   const refetchSongs = useCallback(async () => {
     try {
-      const response = await fetch('/api/songs');
+      const response = await fetch('/api/songs', { cache: 'no-store' });
       if (!response.ok) {
         throw new Error('Failed to refetch songs');
       }
