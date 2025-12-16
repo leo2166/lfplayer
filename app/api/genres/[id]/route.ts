@@ -100,7 +100,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     // Check for associated songs before deleting
     const { count: songCount, error: countError } = await supabase
       .from('songs')
-      .select('id', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .eq('genre_id', genreId);
 
     if (countError) throw countError;

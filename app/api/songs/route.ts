@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
           .eq("user_id", user.id)
           .eq("title", song.title)
           .eq("artist", song.artist)
+          .range(0, 50000) // Search across all potential songs, not just the first 1000
           .maybeSingle()
       )
     )

@@ -107,6 +107,7 @@ export async function DELETE(request: NextRequest) {
       .from("playlist_songs")
       .select("song_id")
       .eq("playlist_id", playlistId)
+      .range(0, 50000)
 
     if (playlistSongsError) {
       console.error("Error fetching songs in playlist:", playlistSongsError)
@@ -121,6 +122,7 @@ export async function DELETE(request: NextRequest) {
         .from("songs")
         .select("blob_url")
         .in("id", songIds)
+        .range(0, 50000)
 
       if (songsError) {
         console.error("Error fetching song blob_urls:", songsError)

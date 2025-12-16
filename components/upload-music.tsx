@@ -4,7 +4,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Upload, Music, AlertCircle, FileCheck, FileX, Loader2, CheckCircle2, XCircle } from "lucide-react"
+import { Upload, Music, AlertCircle, FileCheck, FileX, Loader2, CheckCircle2, XCircle, ClipboardCopy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,6 +54,18 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
   /* NEW STATES */
   const [uploadStats, setUploadStats] = useState<{ total: number; valid: number; ignored: number } | null>(null);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
+
+  const handleCopyLog = () => {
+    if (debugLog.length > 0) {
+      navigator.clipboard.writeText(debugLog.join("\n")).then(() => {
+        setCopyStatus('copied');
+        setTimeout(() => setCopyStatus('idle'), 2000); // Reset after 2 seconds
+      }).catch(err => {
+        console.error("Failed to copy log:", err);
+      });
+    }
+  };
 
   useEffect(() => {
     if (preselectedArtist) {
@@ -533,17 +545,29 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           <div className="space-y-2 pt-4">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-sm">Registro de Diagnóstico Detallado ({debugLog.length} entradas)</h4>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setDebugLog([]);
-                  setUploadStatuses([]);
-                }}
-              >
-                Limpiar Logs
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyLog}
+                  disabled={copyStatus === 'copied'}
+                >
+                  <ClipboardCopy className="w-4 h-4 mr-2" />
+                  {copyStatus === 'copied' ? 'Copiado!' : 'Copiar Log'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDebugLog([]);
+                    setUploadStatuses([]);
+                  }}
+                >
+                  Limpiar Logs
+                </Button>
+              </div>
             </div>
             <div className="max-h-64 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
               {debugLog.map((msg, index) => (
