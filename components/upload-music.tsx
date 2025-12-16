@@ -1,6 +1,8 @@
 // force redeploy #2
 "use client"
 
+import { toast } from "sonner"
+
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
@@ -541,6 +543,43 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         >
           {isLoading ? `Procesando...` : `Confirmar y Subir ${files.length} ${files.length === 1 ? 'canción' : 'canciones'}`}
         </Button>
+
+        {debugLog.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-muted-foreground font-mono">Registro de operaciones:</span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => {
+                    const text = debugLog.join('\n');
+                    navigator.clipboard.writeText(text);
+                    toast.success("Logs copiados al portapapeles");
+                  }}
+                >
+                  Copiar Logs
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs text-destructive hover:text-destructive"
+                  onClick={() => setDebugLog([])}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+            <div className="bg-black/80 p-2 rounded text-xs font-mono text-green-400 h-24 overflow-y-auto whitespace-pre-wrap">
+              {debugLog.map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
+            </div>
+          </div>
+        )}
       </form>
     </div>
   )

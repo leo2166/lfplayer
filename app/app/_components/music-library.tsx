@@ -118,6 +118,16 @@ export default function MusicLibrary() { // Props removed
     }, {} as Record<string, Song[]>)
   }, [filteredSongs])
 
+  // New logic for continuous playback queue
+  const sortedArtistNames = useMemo(() => {
+    return Object.keys(groupedByArtist).sort((a, b) => a.localeCompare(b));
+  }, [groupedByArtist]);
+
+  const playbackQueue = useMemo(() => {
+    return sortedArtistNames.flatMap(artist => groupedByArtist[artist]);
+  }, [sortedArtistNames, groupedByArtist]);
+
+
   if (!hasMounted) {
     return (
       <div className="w-full h-full p-4 md:p-8 space-y-8">
@@ -361,70 +371,73 @@ export default function MusicLibrary() { // Props removed
         />
 
         <Accordion type="single" collapsible className="w-full space-y-2">
-          {Object.entries(groupedByArtist).map(([artist, artistSongs]) => (
-            <AccordionItem value={artist} key={artist} className="border border-border rounded-lg bg-card/50">
-              <AccordionPrimitive.Header className="group flex items-center justify-between w-full px-4">
-                <AccordionPrimitive.Trigger
-                  className={cn("flex flex-1 items-center justify-between py-3 text-left text-sm font-medium transition-all hover:no-underline")}
-                >
-                  <div className="flex items-center gap-3">
-                    <Folder className="w-6 h-6 text-purple-600" />
-                    <div className="text-left">
-                      <h3 className="font-semibold text-lg">{artist}</h3>
-                      <p className="text-sm text-muted-foreground">{artistSongs.length} {artistSongs.length === 1 ? 'canción' : 'canciones'}</p>
+          {sortedArtistNames.map((artist) => {
+            const artistSongs = groupedByArtist[artist];
+            return (
+              <AccordionItem value={artist} key={artist} className="border border-border rounded-lg bg-card/50">
+                <AccordionPrimitive.Header className="group flex items-center justify-between w-full px-4">
+                  <AccordionPrimitive.Trigger
+                    className={cn("flex flex-1 items-center justify-between py-3 text-left text-sm font-medium transition-all hover:no-underline")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Folder className="w-6 h-6 text-purple-600" />
+                      <div className="text-left">
+                        <h3 className="font-semibold text-lg">{artist}</h3>
+                        <p className="text-sm text-muted-foreground">{artistSongs.length} {artistSongs.length === 1 ? 'canción' : 'canciones'}</p>
+                      </div>
                     </div>
+                    <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
+                  </AccordionPrimitive.Trigger>
+                  {userRole === 'admin' && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArtistToAddSongTo(artist);
+                          setGenreToAddSongTo(artistSongs[0]?.genre_id); // Capture genre_id
+                          setAddIndividualMusicOpen(true);
+                        }}
+                        className="h-8 w-8 text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteArtist(artist);
+                        }}
+                        disabled={deletingArtist === artist}
+                        className="h-8 w-8"
+                      >
+                        {deletingArtist === artist ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                      </Button>
+                    </div>
+                  )}
+                </AccordionPrimitive.Header>
+                <AccordionContent className="px-4 pt-2 pb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {artistSongs.map((song) => (
+                      <SongCard
+                        key={song.id}
+                        title={song.title}
+                        artist={song.artist}
+                        duration={song.duration || 0}
+                        genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
+                        onPlay={() => playSong(song, playbackQueue)}
+                        onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
+                        isDeleting={deletingSong?.id === song.id}
+                        isPlaying={isPlaying && currentSong?.id === song.id}
+                      />
+                    ))}
                   </div>
-                  <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
-                </AccordionPrimitive.Trigger>
-                {userRole === 'admin' && (
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setArtistToAddSongTo(artist);
-                        setGenreToAddSongTo(artistSongs[0]?.genre_id); // Capture genre_id
-                        setAddIndividualMusicOpen(true);
-                      }}
-                      className="h-8 w-8 text-primary hover:bg-primary/10"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteArtist(artist);
-                      }}
-                      disabled={deletingArtist === artist}
-                      className="h-8 w-8"
-                    >
-                      {deletingArtist === artist ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
-                    </Button>
-                  </div>
-                )}
-              </AccordionPrimitive.Header>
-              <AccordionContent className="px-4 pt-2 pb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {artistSongs.map((song) => (
-                    <SongCard
-                      key={song.id}
-                      title={song.title}
-                      artist={song.artist}
-                      duration={song.duration || 0}
-                      genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
-                      onPlay={() => playSong(song, artistSongs)}
-                      onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
-                      isDeleting={deletingSong?.id === song.id}
-                      isPlaying={isPlaying && currentSong?.id === song.id}
-                    />
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
 
         {filteredSongs.length === 0 && (
