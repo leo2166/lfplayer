@@ -1,6 +1,7 @@
 "use client"
 
-import { Music, Play, Trash2, Loader2 } from "lucide-react"
+import { Play, Trash2, Loader2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 
 interface SongCardProps {
@@ -23,29 +24,25 @@ export default function SongCard({ title, artist, duration, genre, onPlay, onDel
 
   return (
     <div
-      className={`group relative rounded-lg border p-4 transition-all hover:shadow-md cursor-pointer ${
-        isPlaying
-          ? "border-purple-600 bg-purple-50 dark:bg-purple-950/20"
-          : "border-border bg-card hover:border-purple-400"
-      }`}
+      className={`group relative rounded-lg border p-4 transition-all hover:shadow-md cursor-pointer ${isPlaying
+        ? "border-purple-600 bg-purple-50 dark:bg-purple-950/20"
+        : "border-border bg-card hover:border-purple-400"
+        }`}
       onClick={onPlay}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Music className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <h3 className="font-semibold text-foreground sm:truncate">{title}</h3>
-          </div>
-          {artist && <p className="text-sm text-muted-foreground sm:truncate">{artist}</p>}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <h3 className="font-semibold text-foreground text-sm leading-tight line-clamp-2" title={title}>{title}</h3>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {genre && (
-              <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200">
+              <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200">
                 {genre}
               </span>
             )}
             <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
           </div>
         </div>
+
         <div className="flex items-center gap-2 transition-opacity">
           <Button
             size="icon"
