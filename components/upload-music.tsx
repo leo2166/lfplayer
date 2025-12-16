@@ -569,10 +569,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 </Button>
               </div>
             </div>
-            <div className="max-h-64 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
-              {debugLog.map((msg, index) => (
-                <p key={index} className="whitespace-pre-wrap break-words">{msg}</p>
-              ))}
+            <div className="bg-gray-900 text-white font-mono text-xs rounded-lg p-3 h-10 flex items-center">
+              <p className="whitespace-nowrap overflow-hidden truncate">
+                {debugLog.length > 0 ? debugLog[debugLog.length - 1] : 'Esperando último estado...'}
+              </p>
             </div>
           </div>
         )}

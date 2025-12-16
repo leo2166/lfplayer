@@ -66,10 +66,6 @@ export default function MusicLibrary() { // Props removed
   const [showOrphanResult, setShowOrphanResult] = useState(false);
   const [orphanResult, setOrphanResult] = useState<any>(null);
 
-  // State for rectify
-  const [isRectifying, setIsRectifying] = useState(false);
-  const [showRectifySuccess, setShowRectifySuccess] = useState(false);
-  const [rectifyResult, setRectifyResult] = useState<any>(null);
 
   // State for orphan file deletion
   const [isDeletingOrphans, setIsDeletingOrphans] = useState(false);
@@ -79,10 +75,6 @@ export default function MusicLibrary() { // Props removed
   const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
-
-  // State for broken link deletion
-  const [isDeletingBrokenLinks, setIsDeletingBrokenLinks] = useState(false);
-  const [showBrokenLinkDeleteConfirm, setShowBrokenLinkDeleteConfirm] = useState(false);
 
 
   useEffect(() => {
@@ -303,66 +295,6 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Delete Broken Links Logic ---
-  const handleDeleteBrokenLinks = async () => {
-    setIsDeletingBrokenLinks(true);
-    setShowBrokenLinkDeleteConfirm(false);
-    const toastId = toast.loading(`Eliminando ${brokenLinkResult?.brokenRecordCount || ''} registros rotos...`);
-
-    try {
-      const response = await fetch('/api/cleanup-supabase/broken-links', {
-        method: 'DELETE',
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Ocurrió un error');
-      }
-      toast.success(`Se eliminaron ${result.deletedCount} registros rotos.`, { id: toastId });
-      setShowBrokenLinkResult(false); // Close the results modal
-      setBrokenLinkResult(null);     // Clear the results
-      refetchSongs(); // Use refetchSongs instead of router.refresh()
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-      toast.error(`Error al eliminar registros rotos: ${errorMessage}`, { id: toastId });
-    } finally {
-      setIsDeletingBrokenLinks(false);
-    }
-  };
-
-  // --- Rectify Orphans Logic ---
-  const handleRectifyOrphans = async () => {
-    setIsRectifying(true);
-    const toastId = toast.loading(`Intentando recuperar ${orphanResult?.orphanFileCount || ''} archivos huérfanos...`);
-
-    try {
-      // You could open a dialog here to ask for genreId, but for simplicity we'll let them be uncategorized (null genre)
-      // or we could add a genre selector in the alert dialog. For now, proceeding with null genre.
-      const response = await fetch('/api/rectify-orphans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ genreId: null }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Ocurrió un error');
-      }
-
-      toast.success(`Se recuperaron ${result.rectifiedCount} canciones exitosamente.`, { id: toastId });
-
-      setRectifyResult(result);
-      setShowOrphanResult(false);
-      setShowRectifySuccess(true);
-      refetchSongs(); // Refresh the list to show new songs
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-      toast.error(`Error al recuperar: ${errorMessage}`, { id: toastId });
-    } finally {
-      setIsRectifying(false);
-    }
-  };
-
   return (
     <>
       <div className="w-full h-full p-4 md:p-8 space-y-8">
@@ -403,7 +335,7 @@ export default function MusicLibrary() { // Props removed
                   <Button
                     variant="outline"
                     onClick={handleOrphanCheck}
-                    disabled={isCheckingOrphans || isDeletingOrphans || isRectifying}
+                    disabled={isCheckingOrphans || isDeletingOrphans}
                   >
                     {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Archivos Huérfanos
@@ -578,7 +510,7 @@ export default function MusicLibrary() { // Props removed
                   {orphanResult.orphanFileCount > 0 && (
                     <div className="text-sm pt-2">
                       Se encontraron archivos que existen en R2 pero no en la base de datos.<br />
-                      Puedes intentar <strong>Recuperarlos</strong> (crear registro) o <strong>Eliminarlos</strong> definitivamente.
+                      Puedes <strong>Eliminarlos</strong> definitivamente.
                     </div>
                   )}
                 </div>
@@ -588,7 +520,6 @@ export default function MusicLibrary() { // Props removed
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-between">
-            {/* Modified Footer to include Rectify button */}
             <div className="flex gap-2 w-full sm:w-auto">
               <AlertDialogAction onClick={() => setShowOrphanResult(false)} className="bg-transparent text-primary hover:bg-secondary border border-transparent hover:border-border">Cerrar</AlertDialogAction>
             </div>
@@ -596,20 +527,12 @@ export default function MusicLibrary() { // Props removed
             {orphanResult?.orphanFileCount > 0 && (
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  onClick={handleRectifyOrphans}
-                  disabled={isDeletingOrphans || isRectifying}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isRectifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck className="mr-2 h-4 w-4" />}
-                  Recuperar
-                </Button>
-                <Button
                   variant="destructive"
                   onClick={() => {
                     setShowOrphanResult(false);
                     setShowOrphanDeleteConfirm(true);
                   }}
-                  disabled={isDeletingOrphans || isRectifying}
+                  disabled={isDeletingOrphans}
                 >
                   {isDeletingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                   Eliminar
@@ -619,24 +542,6 @@ export default function MusicLibrary() { // Props removed
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Rectify Success Dialog */}
-      <AlertDialog open={showRectifySuccess} onOpenChange={setShowRectifySuccess}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¡Recuperación Exitosa!</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se han recuperado correctamente **{rectifyResult?.rectifiedCount}** canciones.<br /><br />
-              Ahora aparecerán en tu biblioteca bajo el nombre de artista detectado o "Artista Desconocido".<br />
-              Si quedaron archivos sin recuperar, puedes volver a escanear para eliminarlos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowRectifySuccess(false)}>Entendido</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
 
       {/* Orphan Delete Confirmation Dialog */}
       <AlertDialog open={showOrphanDeleteConfirm} onOpenChange={setShowOrphanDeleteConfirm}>
@@ -710,31 +615,6 @@ export default function MusicLibrary() { // Props removed
               </Button>
             )}
             <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)}>Cerrar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Broken Link Delete Confirmation Dialog */}
-      <AlertDialog open={showBrokenLinkDeleteConfirm} onOpenChange={setShowBrokenLinkDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción es irreversible. Se eliminarán permanentemente
-              **{brokenLinkResult?.brokenRecordCount}** registros de canciones de Supabase.
-              Estos registros apuntan a archivos inexistentes en Cloudflare R2.
-              Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteBrokenLinks}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={isDeletingBrokenLinks}
-            >
-              {isDeletingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sí, eliminar registros rotos'}
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
