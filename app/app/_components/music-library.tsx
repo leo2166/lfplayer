@@ -341,9 +341,9 @@ export default function MusicLibrary() { // Props removed
                     Verificar Archivos Huérfanos
                   </Button>
                   <Button
-                    variant="outline" // Changed from secondary to outline
+                    variant="outline"
                     onClick={handleBrokenLinkCheck}
-                    disabled={isCheckingBrokenLinks || isDeletingBrokenLinks}
+                    disabled={isCheckingBrokenLinks}
                   >
                     {isCheckingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Verificar Registros Rotos
@@ -601,19 +601,6 @@ export default function MusicLibrary() { // Props removed
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            {brokenLinkResult?.brokenRecordCount > 0 && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setShowBrokenLinkResult(false);
-                  setShowBrokenLinkDeleteConfirm(true);
-                }}
-                disabled={isDeletingBrokenLinks}
-              >
-                {isDeletingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Limpiar Registros Rotos
-              </Button>
-            )}
             <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)}>Cerrar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
