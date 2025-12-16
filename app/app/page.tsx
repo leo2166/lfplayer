@@ -9,7 +9,7 @@ export default async function AppPage() {
 
   // Fetch songs and genres in parallel
   const [{ data: songsData }, { data: genresData }] = await Promise.all([
-    supabase.from("songs").select("*").order('title', { ascending: true }),
+    supabase.from("songs").select("*").order('title', { ascending: true }).range(0, 50000),
     supabase.from("genres").select("*").order('name', { ascending: true }),
   ])
 

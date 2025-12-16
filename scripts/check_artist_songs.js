@@ -22,32 +22,32 @@ const supabase = createClient(
 );
 
 async function main() {
-    const targetTitles = [
-        "deja que te cante",
-        "teresa vuelva",
-        "tu volveras",
-        "el son del caballo",
-        "Las Cajas",
-        "sabre olvidar",
-        "tal para cual"
-    ];
+    const searchTerm = "salsa para hacer el amor";
+    console.log(`Buscando canciones con término: '${searchTerm}'...`);
 
-    console.log("Buscando 7 canciones específicas por título parcial...");
-
-    const { data: songs, error } = await supabase
+    // Search in Artist OR Title
+    const { data: songs, error, count } = await supabase
         .from('songs')
-        .select('id, title, artist, genre_id, genres(name), created_at')
-        .or(targetTitles.map(t => `title.ilike.%${t}%`).join(','));
+        .select('*', { count: 'exact' })
+        .or(`artist.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`)
+        .order('created_at', { ascending: false });
 
     if (error) {
         console.error("Error querying Supabase:", error);
         return;
     }
 
-    console.log(`Encontradas: ${songs.length} / 7`);
-    songs.forEach(s => {
-        console.log(`- [${s.id}] '${s.title}' | Artist: '${s.artist}' | Genre: '${s.genres?.name}' (${s.genre_id})`);
-    });
+    console.log(`Encontradas: ${songs.length} canciones.`);
+
+    if (songs.length > 0) {
+        console.log("Muestra (Primeras 5):");
+        songs.slice(0, 5).forEach(s => {
+            console.log(`- [${s.id}] '${s.title}' | Artist: '${s.artist}' | Subido: ${s.created_at}`);
+        });
+
+        // Check finding index in total list to confirm if > 1000
+        // We'll do a separate light query for that or just infer from current logic
+    }
 }
 
 main();
