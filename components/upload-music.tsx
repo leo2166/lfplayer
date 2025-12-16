@@ -290,13 +290,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
           let detailsMsg = 'Ya existe en la biblioteca (Saltada).';
           try {
-            // We need to parse the response body AGAIN because previously we only did saveRes.json() for success flow
-            // Wait, we can't parse it twice. But wait, checking the code, savedSongResponse IS parsed early IF ok.
-            // But if status is 409, saveRes.ok is false.
-            // So we must parse it here.
-            const errorData = await extractErrorData(saveRes); // Helper needed? No, just use savedSongResponse variable which was parsed earlier?
-            // Ah, look at line 286: const savedSongResponse = await saveRes.json();
-            // It's ALREADY parsed. We can use `savedSongResponse`.
+            // savedSongResponse was already parsed at line 285
 
             if (savedSongResponse.details && savedSongResponse.details.length > 0) {
               const d = savedSongResponse.details[0];
@@ -576,15 +570,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
                 </Button>
               </div>
             </div>
-            <div className="max-h-28 overflow-y-auto bg-gray-900 text-white font-mono text-xs rounded-lg p-3 space-y-1">
-              {debugLog.length > 0 ? (
-                debugLog.map((msg, index) => (
-                  <p key={index} className="whitespace-pre-wrap break-words">{msg}</p>
-                ))
-              ) : (
-                <p className="text-gray-400">Esperando logs...</p>
-              )}
+            <div className="h-8 flex items-center bg-gray-900 text-white font-mono text-xs rounded-lg px-3 overflow-hidden">
+              <p className="truncate">{debugLog[debugLog.length - 1]}</p>
             </div>
+
           </div>
         )}
 
