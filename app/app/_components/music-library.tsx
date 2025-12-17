@@ -615,7 +615,7 @@ export default function MusicLibrary() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Playlist Delete Confirmation Dialog */}
+      {/*
       <AlertDialog open={!!playlistToDelete} onOpenChange={(open) => !open && setPlaylistToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -636,6 +636,7 @@ export default function MusicLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      */}
     </div>
   )
 }
