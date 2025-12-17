@@ -148,17 +148,21 @@ export default function MusicLibrary() {
     }
   }
 
-  const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
-    if (!confirm(`¿Estás seguro de eliminar la playlist "${playlistName}"?`)) return
+  const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
+
+  const confirmDeletePlaylist = async () => {
+    if (!playlistToDelete) return
 
     try {
-      const res = await fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/playlists/${playlistToDelete.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error("Error al eliminar")
-      toast.success("Playlist eliminada")
+      toast.success(`Playlist "${playlistToDelete.name}" eliminada`)
       fetchPlaylists()
     } catch (error) {
       console.error(error)
       toast.error("Error al eliminar playlist")
+    } finally {
+      setPlaylistToDelete(null)
     }
   }
 
@@ -415,10 +419,10 @@ export default function MusicLibrary() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-all"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 absolute top-1 right-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all bg-card/50 backdrop-blur-sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDeletePlaylist(pl.id, pl.name)
+                        setPlaylistToDelete({ id: pl.id, name: pl.name })
                       }}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -694,6 +698,28 @@ export default function MusicLibrary() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)}>Cerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Playlist Delete Confirmation Dialog */}
+      <AlertDialog open={!!playlistToDelete} onOpenChange={(open) => !open && setPlaylistToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar Playlist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar la playlist "**{playlistToDelete?.name}**".
+              Esta acción no se puede deshacer, pero las canciones no serán borradas del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeletePlaylist}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Sí, eliminar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
