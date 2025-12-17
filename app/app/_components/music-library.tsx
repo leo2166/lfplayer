@@ -40,10 +40,12 @@ interface DeleteSummary {
 
 export default function MusicLibrary() {
   const userRole = useUserRole()
-  const { songs, genres, playlists, fetchPlaylists, refetchSongs } = useMusicLibrary()
+  const { songs, genres, refetchSongs } = useMusicLibrary() // playlists, fetchPlaylists
   const [selectedGenre, setSelectedGenre] = useState("all")
+  /*
   const [isPlaylistWizardOpen, setIsPlaylistWizardOpen] = useState(false)
   const [loadingPlaylistId, setLoadingPlaylistId] = useState<string | null>(null)
+  */
 
   const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
   const [deletingSong, setDeletingSong] = useState<Song | null>(null)
@@ -70,6 +72,7 @@ export default function MusicLibrary() {
   const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
+  // const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
 
   useEffect(() => {
     setHasMounted(true);
@@ -127,29 +130,7 @@ export default function MusicLibrary() {
     )
   }
 
-  const handlePlayPlaylist = async (playlistId: string) => {
-    try {
-      setLoadingPlaylistId(playlistId)
-      const res = await fetch(`/api/playlists/${playlistId}`)
-      if (!res.ok) throw new Error("Error al cargar playlist")
-      const data = await res.json()
-
-      if (data.songs && data.songs.length > 0) {
-        toast.success(`Reproduciendo playlist: ${data.playlist.name}`)
-        playSong(data.songs[0], data.songs)
-      } else {
-        toast.error("La playlist está vacía")
-      }
-    } catch (error) {
-      console.error(error)
-      toast.error("Error al reproducir playlist")
-    } finally {
-      setLoadingPlaylistId(null)
-    }
-  }
-
-  const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
-
+/*
   const confirmDeletePlaylist = async () => {
     if (!playlistToDelete) return
 
@@ -165,6 +146,7 @@ export default function MusicLibrary() {
       setPlaylistToDelete(null)
     }
   }
+*/
 
   const handleDeleteArtist = async (artist: string) => {
     if (deletingArtist === artist) return;
@@ -377,75 +359,6 @@ export default function MusicLibrary() {
           </div>
         </div>
       )}
-
-      {/* Playlist Section - NEW */}
-      <div className="flex flex-col gap-4 p-4 rounded-xl bg-card/30 border border-border/50">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Disc className="w-6 h-6 text-purple-500" />
-            Mis Playlists
-          </h2>
-          {userRole === 'admin' && (
-            <Button onClick={() => setIsPlaylistWizardOpen(true)} className="gap-2 bg-purple-600 hover:bg-purple-700 text-white border-none shadow-lg shadow-purple-900/20">
-              <Plus className="w-4 h-4" /> Nueva Playlist
-            </Button>
-          )}
-        </div>
-
-        {playlists && playlists.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-thin scrollbar-thumb-muted">
-            {playlists.map((pl: any) => (
-              <div key={pl.id} className="min-w-[180px] w-[180px] bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:shadow-md hover:border-purple-500/30 transition-all group relative">
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-xl shadow-inner mb-2" style={{ backgroundColor: pl.cover_color || '#7C3AED' }}>
-                    {pl.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <h3 className="font-semibold truncate text-foreground" title={pl.name}>{pl.name}</h3>
-                  <p className="text-xs text-muted-foreground">{pl.playlist_songs?.[0]?.count || 0} canciones</p>
-                </div>
-
-                <div className="flex gap-2 justify-center mt-auto opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="w-full text-xs h-8 bg-secondary hover:bg-secondary/80"
-                    onClick={() => handlePlayPlaylist(pl.id)}
-                    disabled={loadingPlaylistId === pl.id}
-                  >
-                    {loadingPlaylistId === pl.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reproducir"}
-                  </Button>
-
-                  {userRole === 'admin' && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 absolute top-1 right-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all bg-card/50 backdrop-blur-sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setPlaylistToDelete({ id: pl.id, name: pl.name })
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-[100px] border-2 border-dashed border-muted rounded-xl bg-muted/5">
-            <p className="text-muted-foreground text-sm">No hay playlists creadas aún.</p>
-          </div>
-        )}
-
-        <PlaylistWizard
-          isOpen={isPlaylistWizardOpen}
-          onClose={() => setIsPlaylistWizardOpen(false)}
-          songs={songs}
-          genres={genres}
-          onPlaylistCreated={() => fetchPlaylists()}
-        />
-      </div>
 
       <GenreFilter
         genres={genres}
