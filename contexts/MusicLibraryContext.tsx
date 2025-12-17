@@ -7,7 +7,9 @@ import { useRouter } from 'next/navigation';
 interface MusicLibraryContextType {
   songs: Song[];
   genres: Genre[];
+  playlists: any[];
   refetchSongs: () => Promise<void>;
+  fetchPlaylists: () => Promise<void>;
 }
 
 const MusicLibraryContext = createContext<MusicLibraryContextType | undefined>(undefined);
@@ -24,6 +26,8 @@ export function MusicLibraryProvider({
   const [songs, setSongs] = useState<Song[]>(Array.isArray(propInitialSongs) ? propInitialSongs : []);
   const [genres, setGenres] = useState<Genre[]>(Array.isArray(propInitialGenres) ? propInitialGenres : []);
   const router = useRouter();
+
+  const [playlists, setPlaylists] = useState<any[]>([]);
 
   // Update state ONLY when content actually changes
   // Optimization: Move JSON.stringify inside useEffect to avoid calculation on every render
@@ -47,6 +51,22 @@ export function MusicLibraryProvider({
     }
   }, [propInitialGenres]);
 
+  const fetchPlaylists = useCallback(async () => {
+    try {
+      const response = await fetch('/api/playlists', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch playlists');
+      const data = await response.json();
+      setPlaylists(data.playlists || []);
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+    }
+  }, []);
+
+  // Fetch playlists on mount
+  useEffect(() => {
+    fetchPlaylists();
+  }, [fetchPlaylists]);
+
   const refetchSongs = useCallback(async () => {
     try {
       const response = await fetch('/api/songs', { cache: 'no-store' });
@@ -66,7 +86,9 @@ export function MusicLibraryProvider({
   const contextValue = {
     songs,
     genres,
+    playlists,
     refetchSongs,
+    fetchPlaylists,
   };
 
   return (

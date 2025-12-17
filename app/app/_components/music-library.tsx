@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import type { Song, Genre } from "@/lib/types"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useUserRole } from "@/contexts/UserRoleContext"
-import { useMusicLibrary } from "@/contexts/MusicLibraryContext" // NEW IMPORT
+import { useMusicLibrary } from "@/contexts/MusicLibraryContext"
 import { toast } from "sonner"
 import {
   Accordion,
@@ -22,92 +22,76 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogCancel,
-} from "@/components/ui/alert-dialog" // Import AlertDialog components
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import GenreFilter from "@/components/genre-filter"
 import SongCard from "@/components/song-card"
-import AddMusicDialog from "@/components/add-music-dialog" // NEW IMPORT
-import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck } from "lucide-react"
+import { PlaylistWizard } from "@/components/playlist-wizard"
+import AddMusicDialog from "@/components/add-music-dialog"
+import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-interface DeleteSummary { // Define the shape of the delete summary
+interface DeleteSummary {
   totalSongs: number;
   deletedFromR2: number;
   deletedFromSupabase: number;
 }
 
-export default function MusicLibrary() { // Props removed
+export default function MusicLibrary() {
   const userRole = useUserRole()
-  const { songs, genres, refetchSongs } = useMusicLibrary() // Consume context
+  const { songs, genres, playlists, fetchPlaylists, refetchSongs } = useMusicLibrary()
   const [selectedGenre, setSelectedGenre] = useState("all")
+  const [isPlaylistWizardOpen, setIsPlaylistWizardOpen] = useState(false)
+  const [loadingPlaylistId, setLoadingPlaylistId] = useState<string | null>(null)
+
   const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
-  // State for single song deletion
   const [deletingSong, setDeletingSong] = useState<Song | null>(null)
-  // State to prevent hydration errors
   const [hasMounted, setHasMounted] = useState(false)
-  const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false) // New state
-  const [artistToAddSongTo, setArtistToAddSongTo] = useState<string | undefined>(undefined) // New state
+  const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false)
+  const [artistToAddSongTo, setArtistToAddSongTo] = useState<string | undefined>(undefined)
   const [genreToAddSongTo, setGenreToAddSongTo] = useState<string | undefined>(undefined)
 
-  // State for delete summary modal
   const [showDeleteSummary, setShowDeleteSummary] = useState(false);
   const [deleteSummary, setDeleteSummary] = useState<DeleteSummary | null>(null);
   const [deleteSummaryTitle, setDeleteSummaryTitle] = useState("Resumen de Eliminación");
 
-
-  // State for delete by date
   const [deleteDate, setDeleteDate] = useState('');
   const [isDeletingByDate, setIsDeletingByDate] = useState(false);
   const [showDateDeleteConfirm, setShowDateDeleteConfirm] = useState(false);
 
-  // State for orphan file check
   const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
   const [showOrphanResult, setShowOrphanResult] = useState(false);
   const [orphanResult, setOrphanResult] = useState<any>(null);
 
-
-  // State for orphan file deletion
   const [isDeletingOrphans, setIsDeletingOrphans] = useState(false);
   const [showOrphanDeleteConfirm, setShowOrphanDeleteConfirm] = useState(false);
 
-  // State for broken link check
   const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
 
-
   useEffect(() => {
     setHasMounted(true);
-  }, []); // Empty dependency array ensures this runs once.
+  }, []);
 
-
-  const router = useRouter() // Keep useRouter for general navigation, not for refresh
+  const router = useRouter()
   const { playSong, currentSong, isPlaying } = useMusicPlayer()
 
   const genreMap = useMemo(() => {
-    if (!Array.isArray(genres)) {
-      console.warn("MusicLibrary (Client) WARN: genres is not an array in genreMap useMemo, defaulting to empty Map:", genres);
-      return new Map();
-    }
+    if (!Array.isArray(genres)) return new Map();
     return new Map(genres.map((genre) => [genre.id, genre.name]));
   }, [genres]);
 
   const filteredSongs = useMemo(() => {
-    if (!Array.isArray(songs)) {
-      console.warn("MusicLibrary (Client) WARN: songs is not an array in filteredSongs useMemo, defaulting to empty array:", songs);
-      return [];
-    }
+    if (!Array.isArray(songs)) return [];
     return selectedGenre === "all"
       ? songs
       : songs.filter((song) => song.genre_id === selectedGenre);
   }, [selectedGenre, songs]);
 
   const groupedByArtist = useMemo(() => {
-    if (!Array.isArray(filteredSongs)) {
-      console.warn("MusicLibrary (Client) WARN: filteredSongs is not an array in groupedByArtist useMemo, defaulting to empty object:", filteredSongs);
-      return {};
-    }
+    if (!Array.isArray(filteredSongs)) return {};
     return filteredSongs.reduce((acc, song) => {
       const artist = song.artist || "Artista Desconocido"
       if (!acc[artist]) {
@@ -118,7 +102,6 @@ export default function MusicLibrary() { // Props removed
     }, {} as Record<string, Song[]>)
   }, [filteredSongs])
 
-  // New logic for continuous playback queue
   const sortedArtistNames = useMemo(() => {
     return Object.keys(groupedByArtist).sort((a, b) => a.localeCompare(b));
   }, [groupedByArtist]);
@@ -126,7 +109,6 @@ export default function MusicLibrary() { // Props removed
   const playbackQueue = useMemo(() => {
     return sortedArtistNames.flatMap(artist => groupedByArtist[artist]);
   }, [sortedArtistNames, groupedByArtist]);
-
 
   if (!hasMounted) {
     return (
@@ -145,9 +127,43 @@ export default function MusicLibrary() { // Props removed
     )
   }
 
-  // --- Artist Deletion Logic ---
+  const handlePlayPlaylist = async (playlistId: string) => {
+    try {
+      setLoadingPlaylistId(playlistId)
+      const res = await fetch(`/api/playlists/${playlistId}`)
+      if (!res.ok) throw new Error("Error al cargar playlist")
+      const data = await res.json()
+
+      if (data.songs && data.songs.length > 0) {
+        toast.success(`Reproduciendo playlist: ${data.playlist.name}`)
+        playSong(data.songs[0], data.songs)
+      } else {
+        toast.error("La playlist está vacía")
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al reproducir playlist")
+    } finally {
+      setLoadingPlaylistId(null)
+    }
+  }
+
+  const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar la playlist "${playlistName}"?`)) return
+
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error("Error al eliminar")
+      toast.success("Playlist eliminada")
+      fetchPlaylists()
+    } catch (error) {
+      console.error(error)
+      toast.error("Error al eliminar playlist")
+    }
+  }
+
   const handleDeleteArtist = async (artist: string) => {
-    if (deletingArtist === artist) return; // Prevent multiple deletions
+    if (deletingArtist === artist) return;
     setDeletingArtist(artist);
     const toastId = toast.loading(`Eliminando artista '${artist}'...`);
     try {
@@ -160,11 +176,11 @@ export default function MusicLibrary() { // Props removed
       if (!response.ok) {
         throw new Error(result.error || 'Ocurrió un error');
       }
-      toast.dismiss(toastId); // Dismiss loading toast
-      setDeleteSummaryTitle(`Resumen de Eliminación - ${artist}`); // Set dynamic title
-      setDeleteSummary(result.summary); // Set the summary data
-      setShowDeleteSummary(true);     // Show the summary modal
-      refetchSongs(); // Use refetchSongs instead of router.refresh()
+      toast.dismiss(toastId);
+      setDeleteSummaryTitle(`Resumen de Eliminación - ${artist}`);
+      setDeleteSummary(result.summary);
+      setShowDeleteSummary(true);
+      refetchSongs();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       const displayError = errorMessage.includes("base de datos") ? errorMessage : `Error al eliminar: ${errorMessage}`;
@@ -174,9 +190,8 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Single Song Deletion Logic ---
   const handleDeleteSong = async (song: Song) => {
-    if (deletingSong?.id === song.id) return; // Prevent multiple deletions
+    if (deletingSong?.id === song.id) return;
     setDeletingSong(song);
     const toastId = toast.loading(`Eliminando canción '${song.title}'...`);
     try {
@@ -189,7 +204,7 @@ export default function MusicLibrary() { // Props removed
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Canción '${song.title}' eliminada correctamente.`, { id: toastId });
-      refetchSongs(); // Use refetchSongs instead of setTimeout(() => router.refresh(), 100)
+      refetchSongs();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
@@ -198,7 +213,6 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Delete by Date Logic ---
   const handleDeleteByDate = async () => {
     if (!deleteDate || isDeletingByDate) return;
 
@@ -223,8 +237,8 @@ export default function MusicLibrary() { // Props removed
       setDeleteSummaryTitle(`Resumen de Eliminación - ${deleteDate}`);
       setDeleteSummary(result.summary);
       setShowDeleteSummary(true);
-      setDeleteDate(""); // Reset date input
-      refetchSongs(); // Use refetchSongs instead of router.refresh()
+      setDeleteDate("");
+      refetchSongs();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
@@ -233,7 +247,6 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Orphan File Check Logic ---
   const handleOrphanCheck = async () => {
     setIsCheckingOrphans(true);
     const toastId = toast.loading('Buscando archivos huérfanos en R2...');
@@ -256,7 +269,6 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Delete Orphan Files Logic ---
   const handleDeleteOrphans = async () => {
     setIsDeletingOrphans(true);
     setShowOrphanDeleteConfirm(false);
@@ -271,9 +283,9 @@ export default function MusicLibrary() { // Props removed
         throw new Error(result.error || 'Ocurrió un error');
       }
       toast.success(`Se eliminaron ${result.deletedCount} archivos huérfanos.`, { id: toastId });
-      setShowOrphanResult(false); // Close the results modal
-      setOrphanResult(null);     // Clear the results
-      refetchSongs(); // Use refetchSongs instead of router.refresh()
+      setShowOrphanResult(false);
+      setOrphanResult(null);
+      refetchSongs();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast.error(`Error al eliminar: ${errorMessage}`, { id: toastId });
@@ -282,7 +294,6 @@ export default function MusicLibrary() { // Props removed
     }
   };
 
-  // --- Broken Link Check Logic ---
   const handleBrokenLinkCheck = async () => {
     setIsCheckingBrokenLinks(true);
     const toastId = toast.loading('Buscando registros rotos en Supabase...');
@@ -306,152 +317,220 @@ export default function MusicLibrary() { // Props removed
   };
 
   return (
-    <>
-      <div className="w-full h-full p-4 md:p-8 space-y-8">
-        <header className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold">Mi Música</h1>
-            <p className="text-muted-foreground">
-              Filtra por género o busca tus canciones favoritas.
-            </p>
-          </div>
-        </header>
+    <div className="w-full h-full p-4 md:p-8 space-y-8 pb-32">
+      <header className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Mi Música</h1>
+          <p className="text-muted-foreground">
+            Filtra por género o busca tus canciones favoritas.
+          </p>
+        </div>
+      </header>
 
-        {userRole === 'admin' && (
-          <div className="bg-card/50 border border-border rounded-lg p-4 space-y-4">
-            <h3 className="font-semibold text-lg">Panel de Administrador</h3>
-            <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-border pb-4">
-              <p className="text-sm text-muted-foreground flex-shrink-0">Eliminar todo lo subido en una fecha:</p>
-              <Input
-                type="date"
-                value={deleteDate}
-                onChange={(e) => setDeleteDate(e.target.value)}
-                className="w-full sm:w-auto"
-                disabled={isDeletingByDate}
-              />
-              <Button
-                variant="destructive"
-                onClick={() => setShowDateDeleteConfirm(true)}
-                disabled={!deleteDate || isDeletingByDate}
-              >
-                {isDeletingByDate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Eliminar por Fecha
-              </Button>
-            </div>
-            <div className="flex flex-col gap-2 pt-2">
-              <div className="border border-border p-3 rounded-lg">
-                <p className="text-sm text-muted-foreground flex-shrink-0 mb-3">Mantenimiento de Almacenamiento:</p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleOrphanCheck}
-                    disabled={isCheckingOrphans || isDeletingOrphans}
-                  >
-                    {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                    Verificar Archivos Huérfanos
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleBrokenLinkCheck}
-                    disabled={isCheckingBrokenLinks}
-                  >
-                    {isCheckingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                    Verificar Registros Rotos
-                  </Button>
-                </div>
+      {userRole === 'admin' && (
+        <div className="bg-card/50 border border-border rounded-lg p-4 space-y-4">
+          <h3 className="font-semibold text-lg">Panel de Administrador</h3>
+          <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-border pb-4">
+            <p className="text-sm text-muted-foreground flex-shrink-0">Eliminar todo lo subido en una fecha:</p>
+            <Input
+              type="date"
+              value={deleteDate}
+              onChange={(e) => setDeleteDate(e.target.value)}
+              className="w-full sm:w-auto"
+              disabled={isDeletingByDate}
+            />
+            <Button
+              variant="destructive"
+              onClick={() => setShowDateDeleteConfirm(true)}
+              disabled={!deleteDate || isDeletingByDate}
+            >
+              {isDeletingByDate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Eliminar por Fecha
+            </Button>
+          </div>
+          <div className="flex flex-col gap-2 pt-2">
+            <div className="border border-border p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground flex-shrink-0 mb-3">Mantenimiento de Almacenamiento:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleOrphanCheck}
+                  disabled={isCheckingOrphans || isDeletingOrphans}
+                >
+                  {isCheckingOrphans ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Verificar Archivos Huérfanos
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleBrokenLinkCheck}
+                  disabled={isCheckingBrokenLinks}
+                >
+                  {isCheckingBrokenLinks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Verificar Registros Rotos
+                </Button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <GenreFilter
-          genres={genres}
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-        />
+      {/* Playlist Section - NEW */}
+      <div className="flex flex-col gap-4 p-4 rounded-xl bg-card/30 border border-border/50">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Disc className="w-6 h-6 text-purple-500" />
+            Mis Playlists
+          </h2>
+          {userRole === 'admin' && (
+            <Button onClick={() => setIsPlaylistWizardOpen(true)} className="gap-2 bg-purple-600 hover:bg-purple-700 text-white border-none shadow-lg shadow-purple-900/20">
+              <Plus className="w-4 h-4" /> Nueva Playlist
+            </Button>
+          )}
+        </div>
 
-        <Accordion type="single" collapsible className="w-full space-y-2">
-          {sortedArtistNames.map((artist) => {
-            const artistSongs = groupedByArtist[artist];
-            return (
-              <AccordionItem value={artist} key={artist} className="border border-border rounded-lg bg-card/50">
-                <AccordionPrimitive.Header className="group flex items-center justify-between w-full px-4">
-                  <AccordionPrimitive.Trigger
-                    className={cn("flex flex-1 items-center justify-between py-3 text-left text-sm font-medium transition-all hover:no-underline")}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Folder className="w-6 h-6 text-purple-600" />
-                      <div className="text-left">
-                        <h3 className="font-semibold text-lg">{artist}</h3>
-                        <p className="text-sm text-muted-foreground">{artistSongs.length} {artistSongs.length === 1 ? 'canción' : 'canciones'}</p>
-                      </div>
-                    </div>
-                    <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
-                  </AccordionPrimitive.Trigger>
-                  {userRole === 'admin' && (
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setArtistToAddSongTo(artist);
-                          setGenreToAddSongTo(artistSongs[0]?.genre_id); // Capture genre_id
-                          setAddIndividualMusicOpen(true);
-                        }}
-                        className="h-8 w-8 text-primary hover:bg-primary/10"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteArtist(artist);
-                        }}
-                        disabled={deletingArtist === artist}
-                        className="h-8 w-8"
-                      >
-                        {deletingArtist === artist ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
-                      </Button>
-                    </div>
-                  )}
-                </AccordionPrimitive.Header>
-                <AccordionContent className="px-4 pt-2 pb-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {artistSongs.map((song) => (
-                      <SongCard
-                        key={song.id}
-                        title={song.title}
-                        artist={song.artist}
-                        duration={song.duration || 0}
-                        genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
-                        onPlay={() => playSong(song, playbackQueue)}
-                        onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
-                        isDeleting={deletingSong?.id === song.id}
-                        isPlaying={isPlaying && currentSong?.id === song.id}
-                      />
-                    ))}
+        {playlists && playlists.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-thin scrollbar-thumb-muted">
+            {playlists.map((pl: any) => (
+              <div key={pl.id} className="min-w-[180px] w-[180px] bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:shadow-md hover:border-purple-500/30 transition-all group relative">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-xl shadow-inner mb-2" style={{ backgroundColor: pl.cover_color || '#7C3AED' }}>
+                    {pl.name.substring(0, 2).toUpperCase()}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                  <h3 className="font-semibold truncate text-foreground" title={pl.name}>{pl.name}</h3>
+                  <p className="text-xs text-muted-foreground">{pl.playlist_songs?.[0]?.count || 0} canciones</p>
+                </div>
 
-        {filteredSongs.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground">No se encontraron canciones para este género.</p>
-            <p className="text-sm text-muted-foreground/80">Intenta seleccionar otro género o agrega nueva música.</p>
+                <div className="flex gap-2 justify-center mt-auto opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-full text-xs h-8 bg-secondary hover:bg-secondary/80"
+                    onClick={() => handlePlayPlaylist(pl.id)}
+                    disabled={loadingPlaylistId === pl.id}
+                  >
+                    {loadingPlaylistId === pl.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reproducir"}
+                  </Button>
+
+                  {userRole === 'admin' && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeletePlaylist(pl.id, pl.name)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-[100px] border-2 border-dashed border-muted rounded-xl bg-muted/5">
+            <p className="text-muted-foreground text-sm">No hay playlists creadas aún.</p>
           </div>
         )}
+
+        <PlaylistWizard
+          isOpen={isPlaylistWizardOpen}
+          onClose={() => setIsPlaylistWizardOpen(false)}
+          songs={songs}
+          genres={genres}
+          onPlaylistCreated={() => fetchPlaylists()}
+        />
       </div>
+
+      <GenreFilter
+        genres={genres}
+        selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
+      />
+
+      <Accordion type="single" collapsible className="w-full space-y-2">
+        {sortedArtistNames.map((artist) => {
+          const artistSongs = groupedByArtist[artist];
+          return (
+            <AccordionItem value={artist} key={artist} className="border border-border rounded-lg bg-card/50">
+              <AccordionPrimitive.Header className="group flex items-center justify-between w-full px-4">
+                <AccordionPrimitive.Trigger
+                  className={cn("flex flex-1 items-center justify-between py-3 text-left text-sm font-medium transition-all hover:no-underline")}
+                >
+                  <div className="flex items-center gap-3">
+                    <Folder className="w-6 h-6 text-purple-600" />
+                    <div className="text-left">
+                      <h3 className="font-semibold text-lg">{artist}</h3>
+                      <p className="text-sm text-muted-foreground">{artistSongs.length} {artistSongs.length === 1 ? 'canción' : 'canciones'}</p>
+                    </div>
+                  </div>
+                  <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
+                </AccordionPrimitive.Trigger>
+                {userRole === 'admin' && (
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArtistToAddSongTo(artist);
+                        setGenreToAddSongTo(artistSongs[0]?.genre_id);
+                        setAddIndividualMusicOpen(true);
+                      }}
+                      className="h-8 w-8 text-primary hover:bg-primary/10"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteArtist(artist);
+                      }}
+                      disabled={deletingArtist === artist}
+                      className="h-8 w-8"
+                    >
+                      {deletingArtist === artist ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                    </Button>
+                  </div>
+                )}
+              </AccordionPrimitive.Header>
+              <AccordionContent className="px-4 pt-2 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {artistSongs.map((song) => (
+                    <SongCard
+                      key={song.id}
+                      title={song.title}
+                      artist={song.artist}
+                      duration={song.duration || 0}
+                      genre={song.genre_id ? genreMap.get(song.genre_id) : undefined}
+                      onPlay={() => playSong(song, playbackQueue)}
+                      onDelete={userRole === 'admin' ? () => handleDeleteSong(song) : undefined}
+                      isDeleting={deletingSong?.id === song.id}
+                      isPlaying={isPlaying && currentSong?.id === song.id}
+                    />
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+
+      {filteredSongs.length === 0 && (
+        <div className="text-center py-16">
+          <p className="text-muted-foreground">No se encontraron canciones para este género.</p>
+          <p className="text-sm text-muted-foreground/80">Intenta seleccionar otro género o agrega nueva música.</p>
+        </div>
+      )}
+
       <AddMusicDialog
         open={isAddIndividualMusicOpen}
         onOpenChange={setAddIndividualMusicOpen}
         onUploadSuccess={() => {
-          setAddIndividualMusicOpen(false); // Call refetchSongs from context
+          setAddIndividualMusicOpen(false);
           refetchSongs();
         }}
         preselectedArtist={artistToAddSongTo}
@@ -618,6 +697,6 @@ export default function MusicLibrary() { // Props removed
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }

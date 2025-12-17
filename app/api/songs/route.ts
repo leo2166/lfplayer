@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
           const genreName = g ? (Array.isArray(g) ? g[0]?.name : g.name) : 'Desconocido';
           return {
             title: d.song.title,
+            artist: d.result.data?.artist,
             genre: genreName,
             created_at: d.result.data?.created_at
           };

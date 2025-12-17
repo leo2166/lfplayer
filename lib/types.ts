@@ -20,5 +20,6 @@ export interface Genre extends SupabaseTable {
   name: string
   description?: string
   color?: string
+  display_order?: number
   created_by?: string
 }

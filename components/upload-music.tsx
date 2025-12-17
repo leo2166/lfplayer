@@ -286,7 +286,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
             if (savedSongResponse.details && savedSongResponse.details.length > 0) {
               const d = savedSongResponse.details[0];
               const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString() : '';
-              detailsMsg = `Duplicado en género: ${d.genre} (${dateStr})`;
+              detailsMsg = `Ya existe: ${d.artist || 'Desconocido'} / ${d.genre}`;
             }
           } catch (e) {
             log(`[${currentFileName}] Error al parsear detalles del duplicado: ${e}`);
