@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Search, CheckCircle2, Music, Disc, Folder, ChevronRight, ChevronDown } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { toast } from "sonner"
@@ -211,7 +210,7 @@ export function PlaylistWizard({ isOpen, onClose, songs, genres, onPlaylistCreat
                                 </div>
                             </div>
 
-                            <ScrollArea className="flex-1 px-4">
+                            <div className="flex-1 overflow-y-auto px-4 min-h-0">
                                 <div className="py-2 space-y-2">
                                     <Accordion type="multiple" className="space-y-2">
                                         {treeData.map(genre => (
@@ -294,7 +293,7 @@ export function PlaylistWizard({ isOpen, onClose, songs, genres, onPlaylistCreat
                                         )}
                                     </Accordion>
                                 </div>
-                            </ScrollArea>
+                            </div>
                         </div>
                     )}
                 </div>
