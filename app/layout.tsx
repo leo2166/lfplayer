@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import GlobalMusicPlayer from "@/components/global-music-player"
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext"
 import "./globals.css"
@@ -15,9 +14,9 @@ export const metadata: Metadata = {
   description: "Tu aplicación de música personal. Crea playlists, organiza por género y reproduce tu música favorita.",
   generator: "v0.app",
   other: {
-    "application-version": "1.2.2-react-fix",
-    "deploy-id": "20251217-1235", // Manual timestamp ID
-    "deploy-time": "2025-12-17T12:35:00-04:00",
+    "application-version": "1.2.5-ui-version",
+    "deploy-id": "20251217-1300", // Manual timestamp ID
+    "deploy-time": "2025-12-17T13:00:00-04:00",
   },
   manifest: "/manifest.json", // Añadir manifest
   icons: {
@@ -56,7 +55,6 @@ export default function RootLayout({
           {children}
           <GlobalMusicPlayer />
         </MusicPlayerProvider>
-        <Analytics />
       </body>
     </html>
   )

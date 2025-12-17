@@ -42,7 +42,6 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "@vercel/analytics": "latest",
     "@vercel/blob": "latest",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",

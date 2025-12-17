@@ -129,7 +129,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                 {/* Footer Info */}
                 <div className="p-4 border-t border-border">
                     <div className="text-xs text-muted-foreground text-center">
-                        <p>Preferencia Musical v1.0</p>
+                        <p>Preferencia Musical v1.2.5 (Fix Payload)</p>
                         <p>Propiedad de Ing. Lucidio Fuenmayor.</p>
                     </div>
                 </div>
