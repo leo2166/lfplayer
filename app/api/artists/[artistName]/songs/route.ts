@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { artistName: string } }
+  { params }: { params: Promise<{ artistName: string }> }
 ) {
   try {
     const supabase = await createClient()
@@ -15,7 +15,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const artistName = decodeURIComponent(params.artistName)
+    const { artistName: encodedArtistName } = await params
+    const artistName = decodeURIComponent(encodedArtistName)
 
     if (!artistName) {
       return NextResponse.json({ error: "Artist name is required" }, { status: 400 })
@@ -34,9 +35,9 @@ export async function GET(
     // Return a simple array of titles
     const titles = data.map(song => song.title)
     return NextResponse.json({ titles })
-    
+
   } catch (error) {
-    console.error(`Error fetching songs for artist ${params.artistName}:`, error)
+    console.error(`Error fetching songs for artist:`, error)
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json({ error: `Failed to fetch songs: ${errorMessage}` }, { status: 500 })
   }

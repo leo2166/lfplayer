@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 // PUT /api/genres/[id] - Update a genre
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
 
@@ -23,7 +23,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Forbidden: Only admins can update genres" }, { status: 403 })
     }
 
-    const genreId = await params.id
+    const { id: genreId } = await params
     const { name, color } = await request.json()
 
     if (!genreId) {
@@ -70,7 +70,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // DELETE /api/genres/[id] - Delete a genre
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
 
@@ -91,7 +91,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: "Forbidden: Only admins can delete genres" }, { status: 403 })
     }
 
-    const genreId = await params.id
+    const { id: genreId } = await params
 
     if (!genreId) {
       return NextResponse.json({ error: "Genre ID is required" }, { status: 400 })

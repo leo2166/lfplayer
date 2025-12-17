@@ -4,11 +4,11 @@ import { type NextRequest, NextResponse } from "next/server"
 // GET /api/playlists/[id] - Get single playlist details with songs
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient()
-        const { id } = params
+        const { id } = await params
 
         // 1. Get Playlist info
         const { data: playlist, error: playlistError } = await supabase
@@ -64,11 +64,11 @@ export async function GET(
 // DELETE /api/playlists/[id] - Delete playlist (Safe delete, only DB record)
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient()
-        const { id } = params
+        const { id } = await params
 
         // Auth Check
         const {

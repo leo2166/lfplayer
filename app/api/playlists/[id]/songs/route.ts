@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
     const {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { data: playlist } = await supabase
       .from("playlists")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .eq("user_id", user.id)
       .single()
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           genres (id, name, color)
         )
       `)
-      .eq("playlist_id", params.id)
+      .eq("playlist_id", (await params).id)
       .order("position")
 
     if (error) throw error
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
     const {
@@ -67,10 +67,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { song_id, song_ids } = body
 
     // Verify user owns this playlist
+    const { id: playlistId } = await params
+
     const { data: playlist } = await supabase
       .from("playlists")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", playlistId)
       .eq("user_id", user.id)
       .single()
 
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const { data: maxPositionData } = await supabase
       .from("playlist_songs")
       .select("position")
-      .eq("playlist_id", params.id)
+      .eq("playlist_id", playlistId)
       .order("position", { ascending: false })
       .limit(1)
 
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       // Batch insert
       const songsToInsert = song_ids.map((id, index) => {
         return {
-          playlist_id: params.id,
+          playlist_id: playlistId,
           song_id: id,
           position: currentMaxPosition + 1 + index,
         }
@@ -102,21 +104,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const { data, error } = await supabase.from("playlist_songs").insert(songsToInsert).select()
 
       if (error) throw error
-      
+
       return NextResponse.json({ success: true, count: data.length })
     } else if (song_id) {
       // Single insert
       const { data, error } = await supabase
         .from("playlist_songs")
         .insert({
-          playlist_id: params.id,
+          playlist_id: playlistId,
           song_id,
           position: currentMaxPosition + 1,
         })
         .select()
 
       if (error) throw error
-      
+
       return NextResponse.json({ playlistSong: data[0] })
     } else {
       return NextResponse.json({ error: "song_id or song_ids is required" }, { status: 400 })
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
     const {
@@ -145,7 +147,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const { data: playlist } = await supabase
       .from("playlists")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .eq("user_id", user.id)
       .single()
 
@@ -153,7 +155,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Playlist not found" }, { status: 404 })
     }
 
-    const { error } = await supabase.from("playlist_songs").delete().eq("playlist_id", params.id).eq("song_id", song_id)
+    const { error } = await supabase.from("playlist_songs").delete().eq("playlist_id", (await params).id).eq("song_id", song_id)
 
     if (error) throw error
 
