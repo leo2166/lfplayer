@@ -15,9 +15,9 @@ export const metadata: Metadata = {
   description: "Tu aplicación de música personal. Crea playlists, organiza por género y reproduce tu música favorita.",
   generator: "v0.app",
   other: {
-    "application-version": "1.2.1-duplicate-resilience",
-    "deploy-id": "20251215-1713", // Manual timestamp ID
-    "deploy-time": new Date().toISOString(),
+    "application-version": "1.2.2-react-fix",
+    "deploy-id": "20251217-1235", // Manual timestamp ID
+    "deploy-time": "2025-12-17T12:35:00-04:00",
   },
   manifest: "/manifest.json", // Añadir manifest
   icons: {

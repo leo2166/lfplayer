@@ -31,11 +31,20 @@ export function MusicLibraryProvider({
 
   // Update state ONLY when content actually changes
   // Optimization: Move JSON.stringify inside useEffect to avoid calculation on every render
+  // Update state when content changes from server (e.g. after refresh)
+  // We use a simplified check (length + timestamp/id sum) solely to detect meaningful server changes
+  // without triggering expensive JSON.stringify on every render or potential loops.
   useEffect(() => {
     if (propInitialSongs && Array.isArray(propInitialSongs)) {
       setSongs(prev => {
-        // Only update if content is different
-        if (JSON.stringify(prev) === JSON.stringify(propInitialSongs)) return prev;
+        if (prev === propInitialSongs) return prev;
+        if (prev.length === propInitialSongs.length) {
+          // Simple heuristic to avoid deep comparison loops:
+          // If length is same and first/last IDs match, assume it's the same data to prevent re-render loop
+          const prevIds = prev.length > 0 ? prev[0].id + prev[prev.length - 1].id : "";
+          const newIds = propInitialSongs.length > 0 ? propInitialSongs[0].id + propInitialSongs[propInitialSongs.length - 1].id : "";
+          if (prevIds === newIds) return prev;
+        }
         return propInitialSongs;
       });
     }
@@ -44,7 +53,7 @@ export function MusicLibraryProvider({
   useEffect(() => {
     if (propInitialGenres && Array.isArray(propInitialGenres)) {
       setGenres(prev => {
-        // Only update if content is different
+        if (prev === propInitialGenres) return prev;
         if (JSON.stringify(prev) === JSON.stringify(propInitialGenres)) return prev;
         return propInitialGenres;
       });
