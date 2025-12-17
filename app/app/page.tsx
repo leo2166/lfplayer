@@ -14,7 +14,8 @@ export default async function AppPage() {
 
   ])
 
-  const songs: Song[] = songsData ?? []
+  // DEBUG: Force empty songs to isolate if data payload is causing the crash
+  const songs: Song[] = [] // songsData ?? []
   const genres: Genre[] = genresData ?? []
 
   return (
