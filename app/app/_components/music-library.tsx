@@ -40,12 +40,10 @@ interface DeleteSummary {
 
 export default function MusicLibrary() {
   const userRole = useUserRole()
-  const { songs, genres, refetchSongs } = useMusicLibrary() // playlists, fetchPlaylists
+  const { songs, genres, refetchSongs, playlists, fetchPlaylists } = useMusicLibrary()
   const [selectedGenre, setSelectedGenre] = useState("all")
-  /*
   const [isPlaylistWizardOpen, setIsPlaylistWizardOpen] = useState(false)
   const [loadingPlaylistId, setLoadingPlaylistId] = useState<string | null>(null)
-  */
 
   const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
   const [deletingSong, setDeletingSong] = useState<Song | null>(null)
@@ -72,7 +70,7 @@ export default function MusicLibrary() {
   const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
-  // const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
+  const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
 
   useEffect(() => {
     setHasMounted(true);
@@ -130,7 +128,6 @@ export default function MusicLibrary() {
     )
   }
 
-/*
   const confirmDeletePlaylist = async () => {
     if (!playlistToDelete) return
 
@@ -146,7 +143,6 @@ export default function MusicLibrary() {
       setPlaylistToDelete(null)
     }
   }
-*/
 
   const handleDeleteArtist = async (artist: string) => {
     if (deletingArtist === artist) return;
@@ -615,13 +611,12 @@ export default function MusicLibrary() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/*
       <AlertDialog open={!!playlistToDelete} onOpenChange={(open) => !open && setPlaylistToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar Playlist?</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de eliminar la playlist "**{playlistToDelete?.name}**".
+              Estás a punto de eliminar la playlist "{playlistToDelete?.name}".
               Esta acción no se puede deshacer, pero las canciones no serán borradas del sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -636,7 +631,6 @@ export default function MusicLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      */}
     </div>
   )
 }
