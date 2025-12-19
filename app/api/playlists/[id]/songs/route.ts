@@ -9,7 +9,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      // For GET we allow guests. Ideally we can check RLS policies but here we open it.
+      // return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Verify user owns this playlist
@@ -17,7 +18,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .from("playlists")
       .select("id")
       .eq("id", (await params).id)
-      .eq("user_id", user.id)
       .single()
 
     if (!playlist) {

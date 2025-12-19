@@ -301,11 +301,22 @@ export default function MusicLibrary() {
   return (
     <div className="w-full h-full p-4 md:p-8 space-y-8 pb-32">
       <header className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Mi Música</h1>
-          <p className="text-muted-foreground">
-            Filtra por género o busca tus canciones favoritas.
-          </p>
+        <div className="flex items-center justify-between w-full">
+          <div>
+            <h1 className="text-3xl font-bold">Mi Música</h1>
+            <p className="text-muted-foreground">
+              Filtra por género o busca tus canciones favoritas.
+            </p>
+          </div>
+          {userRole === 'admin' && (
+            <Button
+              onClick={() => setIsPlaylistWizardOpen(true)}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2 shadow-lg hover:shadow-xl transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Playlist
+            </Button>
+          )}
         </div>
       </header>
 
@@ -448,6 +459,17 @@ export default function MusicLibrary() {
         }}
         preselectedArtist={artistToAddSongTo}
         preselectedGenreId={genreToAddSongTo}
+      />
+
+      <PlaylistWizard
+        isOpen={isPlaylistWizardOpen}
+        onClose={() => setIsPlaylistWizardOpen(false)}
+        songs={songs}
+        genres={genres}
+        onPlaylistCreated={() => {
+          setIsPlaylistWizardOpen(false)
+          fetchPlaylists()
+        }}
       />
 
       {/* Delete Summary AlertDialog */}

@@ -16,6 +16,7 @@ interface MusicPlayerProps {
   onPrev: () => void
   onSeek: (time: number) => void
   onTimeUpdate: (time: number) => void
+  layout?: "bar" | "card"
 }
 
 export default function MusicPlayer({
@@ -27,6 +28,7 @@ export default function MusicPlayer({
   onPrev,
   onSeek,
   onTimeUpdate,
+  layout = "bar",
 }: MusicPlayerProps) {
   const [volume, setVolume] = useState([100])
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -37,7 +39,15 @@ export default function MusicPlayer({
     if (!audio) return
 
     if (isPlaying) {
-      audio.play().catch((e) => console.error("Audio play failed:", e))
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          // Ignore AbortError which happens when pausing/loading new content while playing
+          if (e.name !== 'AbortError') {
+            console.error("Audio play failed:", e)
+          }
+        })
+      }
     } else {
       audio.pause()
     }
@@ -75,10 +85,70 @@ export default function MusicPlayer({
   }
 
   if (!currentSong) {
-    // This part might not be reached if GlobalMusicPlayer handles the null case, but good for robustness
     return null
   }
 
+  if (layout === "card") {
+    return (
+      <div className="w-full flex flex-col items-center gap-6 p-2">
+        {/* Album Art - Larger for card */}
+        <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-2xl bg-gradient-to-br from-purple-500/80 to-pink-500/80 shadow-2xl flex items-center justify-center mb-2 animate-in zoom-in-50 duration-500">
+          <Music className="w-20 h-20 text-white drop-shadow-md" />
+        </div>
+
+        {/* Info */}
+        <div className="text-center space-y-1 w-full px-4">
+          <h3 className="text-lg font-bold text-foreground line-clamp-2 drop-shadow-sm min-h-[1.75rem]">{currentSong.title}</h3>
+          <p className="text-lg text-muted-foreground truncate">{currentSong.artist || "Artista desconocido"}</p>
+        </div>
+
+        {/* Progress */}
+        <div className="w-full space-y-2 px-2">
+          <Slider
+            value={[currentTime]}
+            max={currentSong.duration || 0}
+            step={0.1}
+            onValueChange={handleSeek}
+            className="w-full"
+          />
+          <div className="flex justify-between text-xs font-medium text-muted-foreground px-1">
+            <span>{formatTime(currentTime)}</span>
+            <span>{formatTime(currentSong.duration || 0)}</span>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-6 mt-2">
+          <Button variant="ghost" size="icon" onClick={onPrev} className="h-12 w-12 hover:bg-white/10 hover:scale-110 transition-all">
+            <SkipBack className="w-8 h-8" />
+          </Button>
+          <Button
+            size="icon"
+            onClick={onPlayPause}
+            className="h-20 w-20 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-xl hover:scale-105 transition-all text-white border border-white/20"
+          >
+            {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current ml-1" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onNext} className="h-12 w-12 hover:bg-white/10 hover:scale-110 transition-all">
+            <SkipForward className="w-8 h-8" />
+          </Button>
+        </div>
+
+        <audio
+          ref={audioRef}
+          src={currentSong.blob_url}
+          onTimeUpdate={handleTimeUpdateEvent}
+          onLoadedMetadata={() => {
+            if (audioRef.current) audioRef.current.currentTime = currentTime
+          }}
+          onEnded={onNext}
+          crossOrigin="anonymous"
+        />
+      </div>
+    )
+  }
+
+  // Default Bar Layout
   return (
     <div className="w-full">
       {/* Song Info */}
@@ -128,7 +198,7 @@ export default function MusicPlayer({
         src={currentSong.blob_url}
         onTimeUpdate={handleTimeUpdateEvent}
         onLoadedMetadata={() => {
-          if(audioRef.current) audioRef.current.currentTime = currentTime
+          if (audioRef.current) audioRef.current.currentTime = currentTime
         }}
         onEnded={onNext}
         crossOrigin="anonymous"

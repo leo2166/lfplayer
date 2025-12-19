@@ -2,11 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 
-interface Genre {
-  id: string
-  name: string
-  color: string
-}
+import type { Genre } from "@/lib/types"
 
 interface GenreFilterProps {
   genres: Genre[]
