@@ -172,7 +172,7 @@ export function PlaylistWizard({ isOpen, onClose, songs, genres, onPlaylistCreat
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden p-0 bg-muted/5">
+                <div className="flex-1 overflow-y-auto p-0 bg-muted/5" style={{ maxHeight: 'calc(85vh - 180px)' }}>
                     {step === 1 ? (
                         <div className="p-6 space-y-4">
                             <div className="space-y-2">
@@ -210,7 +210,7 @@ export function PlaylistWizard({ isOpen, onClose, songs, genres, onPlaylistCreat
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto px-4 min-h-0">
+                            <div className="flex-1 overflow-y-auto px-4" style={{ maxHeight: 'calc(85vh - 250px)' }}>
                                 <div className="py-2 space-y-2">
                                     <Accordion type="multiple" className="space-y-2">
                                         {treeData.map(genre => (

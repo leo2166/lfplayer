@@ -1,20 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation" // useRouter needed for sign out navigation if handled here? No, kept in layout or moved?
-// Actually, handleSignOut uses router. Let's keep specific logic in component if possible or pass handlers.
-// Sidebar needs: closePlayer (from context), supabase (createBrowserClient), router.
+import { usePathname, useRouter } from "next/navigation"
 import { Music, X, ListMusic, PlusCircle, LogOut } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { useState } from "react"
 import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -32,8 +20,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     const userRole = useUserRole()
     const { closePlayer } = useMusicPlayer()
     const router = useRouter()
-    const [showDevAlert, setShowDevAlert] = useState(false);
-    // We can instantiate supabase here for sign out
+
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -59,7 +46,6 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     ]
 
     return (
-        <>
         <aside
             className={cn(
                 "fixed md:static inset-y-0 left-0 z-40 w-64 border-r border-border bg-card transition-transform duration-300 md:translate-x-0",
@@ -87,25 +73,6 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                     {navItems.map((item) => {
                         const Icon = item.icon
                         const isActive = pathname === item.href
-
-                        if (item.label === "Playlists") {
-                            return (
-                                <button
-                                    key={item.href}
-                                    onClick={() => {
-                                        setShowDevAlert(true)
-                                        onClose()
-                                    }}
-                                    className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
-                                        "text-muted-foreground hover:text-foreground hover:bg-accent",
-                                    )}
-                                >
-                                    <Icon className="w-5 h-5 flex-shrink-0" />
-                                    <span className="font-medium">{item.label}</span>
-                                </button>
-                            )
-                        }
 
                         return (
                             <Link
@@ -142,7 +109,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                         </button>
                     )}
 
-                    {/* Sign Out Button - Moved into navigation */}
+                    {/* Sign Out Button */}
                     <div className="pt-4 mt-4 border-t border-border">
                         <button
                             onClick={handleSignOut}
@@ -160,25 +127,11 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                 {/* Footer Info */}
                 <div className="p-4 border-t border-border">
                     <div className="text-xs text-muted-foreground text-center">
-                        <p>Preferencia Musical v1.2.6 (Debug Mode)</p>
+                        <p>Preferencia Musical v1.3.0</p>
                         <p>Propiedad de Ing. Lucidio Fuenmayor.</p>
                     </div>
                 </div>
             </div>
         </aside>
-        <AlertDialog open={showDevAlert} onOpenChange={setShowDevAlert}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Función en Desarrollo</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta funcionalidad para gestionar playlists se encuentra actualmente en desarrollo y estará disponible en futuras versiones.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogAction onClick={() => setShowDevAlert(false)}>Cerrar</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </>
     )
 }

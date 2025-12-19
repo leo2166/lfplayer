@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Plus } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner"
 import PlaylistCard from "@/components/playlist-card"
-import CreatePlaylistDialog from "@/components/create-playlist-dialog"
+import { PlaylistWizard } from "@/components/playlist-wizard"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useUserRole } from "@/contexts/UserRoleContext"
+import type { Song, Genre } from "@/lib/types"
 
 interface Playlist {
   id: string
@@ -23,25 +24,20 @@ interface Playlist {
 export default function PlaylistsPage() {
   const router = useRouter()
   const userRole = useUserRole()
-  const [user, setUser] = useState<any>(null)
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [songs, setSongs] = useState<Song[]>([])
+  const [genres, setGenres] = useState<Genre[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isWizardOpen, setIsWizardOpen] = useState(false)
   const { playSong } = useMusicPlayer()
 
   useEffect(() => {
-    const getUser = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      setUser(user) // Set user, which will be null for guests
-      await fetchPlaylists()
+    const loadData = async () => {
+      await Promise.all([fetchPlaylists(), fetchSongsAndGenres()])
       setIsLoading(false)
     }
-
-    getUser()
-  }, [router])
+    loadData()
+  }, [])
 
   const fetchPlaylists = async () => {
     try {
@@ -66,35 +62,38 @@ export default function PlaylistsPage() {
     }
   }
 
-    const handleDeletePlaylist = async (playlistId: string) => {
-        try {
-            const res = await fetch(`/api/playlists/${playlistId}`, {
-                method: 'DELETE',
-            });
-            if (res.ok) {
-                toast({
-                    title: 'Playlist eliminada',
-                    description: 'La playlist ha sido eliminada correctamente.',
-                    variant: 'success',
-                });
-                router.refresh();
-            } else {
-                const errorData = await res.json();
-                toast({
-                    title: 'Error al eliminar playlist',
-                    description: errorData.error || 'Ocurrió un error desconocido al eliminar la playlist.',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error) {
-            console.error('Error deleting playlist:', error);
-            toast({
-                title: 'Error al eliminar playlist',
-                description: 'No se pudo conectar con el servidor para eliminar la playlist.',
-                variant: 'destructive',
-            });
-        }
-    };
+  const fetchSongsAndGenres = async () => {
+    try {
+      const [songsRes, genresRes] = await Promise.all([
+        fetch("/api/songs"),
+        fetch("/api/genres")
+      ])
+      const songsData = await songsRes.json()
+      const genresData = await genresRes.json()
+      setSongs(songsData.songs || [])
+      setGenres(genresData.genres || [])
+    } catch (error) {
+      console.error("Error fetching songs/genres:", error)
+    }
+  }
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    try {
+      const res = await fetch(`/api/playlists/${playlistId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        toast.success('Playlist eliminada correctamente')
+        fetchPlaylists()
+      } else {
+        const errorData = await res.json()
+        toast.error(errorData.error || 'Error al eliminar la playlist')
+      }
+    } catch (error) {
+      console.error('Error deleting playlist:', error)
+      toast.error('No se pudo conectar con el servidor')
+    }
+  }
 
   const handlePlaylistSelect = (id: string) => {
     router.push(`/app/playlists/${id}`)
@@ -131,7 +130,7 @@ export default function PlaylistsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary">
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary pb-32">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -145,7 +144,15 @@ export default function PlaylistsPage() {
               Mis Playlists
             </h1>
           </div>
-          {userRole === 'admin' && <CreatePlaylistDialog onCreate={() => fetchPlaylists()} />}
+          {userRole === 'admin' && (
+            <Button
+              onClick={() => setIsWizardOpen(true)}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Playlist
+            </Button>
+          )}
         </div>
       </header>
 
@@ -153,8 +160,12 @@ export default function PlaylistsPage() {
       <main className="container mx-auto px-4 py-8">
         {playlists.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
-            <p className="text-muted-foreground mb-4">No tienes playlists aún</p>
-            <p className="text-sm text-muted-foreground">Crea una nueva playlist para comenzar a organizar tu música</p>
+            <p className="text-muted-foreground mb-4">No hay playlists aún</p>
+            <p className="text-sm text-muted-foreground">
+              {userRole === 'admin'
+                ? 'Crea una nueva playlist para comenzar a organizar tu música'
+                : 'El administrador aún no ha creado playlists'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -174,6 +185,18 @@ export default function PlaylistsPage() {
           </div>
         )}
       </main>
+
+      {/* Playlist Wizard with Cascade Selection */}
+      <PlaylistWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        songs={songs}
+        genres={genres}
+        onPlaylistCreated={() => {
+          setIsWizardOpen(false)
+          fetchPlaylists()
+        }}
+      />
     </div>
   )
 }
