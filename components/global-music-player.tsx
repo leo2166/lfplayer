@@ -30,7 +30,7 @@ export default function GlobalMusicPlayer() {
 
         {/* Button Close Absolute */}
         <div className="absolute top-4 right-4 z-10">
-          <Button variant="ghost" size="icon" onClick={closePlayer} className="h-10 w-10 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+          <Button variant="ghost" size="icon" onClick={closePlayer} className="h-10 w-10 text-black/70 hover:text-black hover:bg-black/10 rounded-full transition-colors">
             <X className="w-6 h-6" />
           </Button>
         </div>
