@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import GlobalMusicPlayer from "@/components/global-music-player"
 import { MusicPlayerProvider } from "@/contexts/MusicPlayerContext"
+import { Analytics } from "@vercel/analytics/react"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -54,6 +55,7 @@ export default function RootLayout({
         <MusicPlayerProvider>
           {children}
           <GlobalMusicPlayer />
+          <Analytics />
         </MusicPlayerProvider>
       </body>
     </html>
