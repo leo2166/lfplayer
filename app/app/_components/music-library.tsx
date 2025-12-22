@@ -29,6 +29,7 @@ import GenreFilter from "@/components/genre-filter"
 import SongCard from "@/components/song-card"
 import { PlaylistWizard } from "@/components/playlist-wizard"
 import AddMusicDialog from "@/components/add-music-dialog"
+import WelcomeOverlay from "@/components/welcome-overlay"
 import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -71,9 +72,15 @@ export default function MusicLibrary() {
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
+  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
+    // Check if user has seen the welcome overlay before
+    const hasSeenWelcome = localStorage.getItem('hasSeenWelcomeOverlay');
+    if (!hasSeenWelcome) {
+      setShowWelcomeOverlay(true);
+    }
   }, []);
 
   const router = useRouter()
@@ -296,6 +303,11 @@ export default function MusicLibrary() {
     } finally {
       setIsCheckingBrokenLinks(false);
     }
+  };
+
+  const handleCloseWelcomeOverlay = () => {
+    setShowWelcomeOverlay(false);
+    localStorage.setItem('hasSeenWelcomeOverlay', 'true');
   };
 
   return (
@@ -653,6 +665,11 @@ export default function MusicLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Welcome Overlay for First-Time Users */}
+      {showWelcomeOverlay && (
+        <WelcomeOverlay onClose={handleCloseWelcomeOverlay} />
+      )}
     </div>
   )
 }

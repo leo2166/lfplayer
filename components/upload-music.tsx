@@ -185,7 +185,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         // Upload with timeout
         const uploadController = new AbortController();
-        const uploadTimeout = setTimeout(() => uploadController.abort(), 60000); // 60s timeout
+        const uploadTimeout = setTimeout(() => uploadController.abort(), 3600000); // 1 hour timeout for large mixes
 
         try {
           const uploadStartTime = Date.now();
@@ -231,7 +231,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         } catch (uploadError) {
           clearTimeout(uploadTimeout);
           if (uploadError instanceof Error && uploadError.name === 'AbortError') {
-            throw new Error(`Timeout al subir a R2 (más de 60 segundos)`);
+            throw new Error(`Timeout al subir a R2 (más de 1 hora)`);
           }
           throw uploadError;
         }
