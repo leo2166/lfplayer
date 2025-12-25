@@ -13,6 +13,7 @@ export interface Song extends SupabaseTable {
   genre_id?: string
   duration?: number
   blob_url: string
+  storage_account_number?: number // Número de cuenta R2 (1 o 2)
 }
 
 // Represents a genre in the database

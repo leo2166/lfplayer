@@ -176,8 +176,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
         });
         if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
-        const { url, downloadUrl } = await presignResponse.json();
-        log(`[${currentFileName}] URL obtenida.`);
+        const { url, downloadUrl, accountNumber } = await presignResponse.json();
+        log(`[${currentFileName}] URL obtenida (Cuenta R2: ${accountNumber}).`);
 
         updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 2/4: Subiendo archivo a R2', 'text-purple-600');
         log(`[${currentFileName}] Subiendo a R2...`);
@@ -263,6 +263,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           genre_id,
           blob_url: downloadUrl,
           duration,
+          storage_account_number: accountNumber, // Registrar en qué cuenta R2 está almacenado
         };
 
         updateStatus(currentFileName, 'Guardando en DB...', 'Paso 4/4: Registrando canción en DB', 'text-blue-600');

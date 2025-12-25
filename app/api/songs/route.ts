@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from 'next/cache';
 import { type NextRequest, NextResponse } from "next/server"
-import { r2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/cloudflare/r2"
+import { getR2ClientForAccount, getAccountNumberFromUrl, updateBucketUsage } from "@/lib/cloudflare/r2-manager"
 import { DeleteObjectCommand } from "@aws-sdk/client-s3"
 
 export async function GET(request: NextRequest) {
@@ -80,9 +80,10 @@ export async function POST(request: NextRequest) {
       songsToInsert = body.map((song) => ({
         ...song,
         user_id: user.id,
+        storage_account_number: song.storage_account_number || 1, // Usar cuenta especificada o default a 1
       }))
     } else {
-      const { title, artist, genre_id, blob_url, duration } = body
+      const { title, artist, genre_id, blob_url, duration, storage_account_number } = body
       songsToInsert = [
         {
           user_id: user.id,
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
           genre_id,
           blob_url,
           duration,
+          storage_account_number: storage_account_number || 1, // Usar cuenta especificada o default a 1
         },
       ]
     }
@@ -195,16 +197,23 @@ export async function DELETE(request: NextRequest) {
 
     if (blob_url) {
       try {
+        // Determinar de qué cuenta es el archivo
+        const accountNumber = getAccountNumberFromUrl(blob_url) as 1 | 2
+        const r2Client = getR2ClientForAccount(accountNumber)
+
         const url = new URL(blob_url)
         const objectKey = url.pathname.substring(1)
 
         const deleteCommand = new DeleteObjectCommand({
-          Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: accountNumber === 1 ? process.env.CLOUDFLARE_R2_BUCKET_NAME! : process.env.CLOUDFLARE_R2_BUCKET_NAME_2!,
           Key: objectKey,
         });
 
-        await r2.send(deleteCommand);
-        console.log(`Successfully deleted object from R2: ${objectKey}`);
+        await r2Client.send(deleteCommand);
+        console.log(`Successfully deleted object from R2 account ${accountNumber}: ${objectKey}`);
+
+        // Actualizar uso de almacenamiento (estimamos tamaño promedio de 4MB)
+        await updateBucketUsage(accountNumber, -4194304);
       } catch (r2Error) {
         console.error("Error deleting from R2:", r2Error);
       }

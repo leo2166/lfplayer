@@ -1,0 +1,40 @@
+bucket: lfplayer-2
+Tokens de API de usuario
+Token de api: CjNmRvWjcI63SGo3Jv7tlmShMhOwzCuZMFcVYRTl
+
+curl "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+-H "Authorization: Bearer CjNmRvWjcI63SGo3Jv7tlmShMhOwzCuZMFcVYRTl"
+
+accund id : ef00c93cf25c2564210cdb1e387c0586
+
+Utilice las siguientes credenciales para clientes S3:
+ID de clave de acceso
+c4bb622049118a962c15104b6e821d66
+Haga clic para copiar
+
+Clave de acceso secreta
+dc66b6cb87c89eb6b23dcecdf427d2d5f5c449eab3087bc8255ef9f9bbeeedf2
+Haga clic para copiar
+
+Utilice puntos de conexión específicos de jurisdicción para clientes de S3:
+PredeterminadoUnión Europea (UE)
+https://ef00c93cf25c2564210cdb1e387c0586.r2.cloudflarestorage.com
+
+Resumen:
+Permisos:
+Permite la capacidad de leer, escribir y mostrar objetos en buckets específicos.
+
+Buckets:
+Todos los buckets R2 en esta cuenta
+Utilice este token para autenticar en Cloudflare API:
+Valor del token
+7wNEkO_6fjcr7PFqHvh5AE2a74gnVs31fbk2lRoR
+Haga clic para copiar
+
+https://ef00c93cf25c2564210cdb1e387c0586.r2.cloudflarestorage.com/lfplayer-2
+
+CLOUDFLARE_R2_ACCOUNT_ID_2="ef00c93cf25c2564210cdb1e387c0586"
+CLOUDFLARE_R2_ACCESS_KEY_ID_2="c4bb622049118a962c15104b6e821d66"
+CLOUDFLARE_R2_SECRET_ACCESS_KEY_2="dc666bcb87c89eb6b23dcecdf427d2df5c449eab3087bc8255ef9f9bbeedf2"
+CLOUDFLARE_R2_BUCKET_NAME_2="lfplayer-2"
+NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL_2="https://pub-2f774f2a26ea44feb5ee92f7c8471093.r2.dev"

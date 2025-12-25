@@ -1,4 +1,4 @@
-import { r2, CLOUDFLARE_R2_BUCKET_NAME } from "@/lib/cloudflare/r2"
+import { getAvailableBucket, getR2ClientForAccount } from "@/lib/cloudflare/r2-manager"
 import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { type NextRequest, NextResponse } from "next/server"
@@ -32,24 +32,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing filename or contentType" }, { status: 400 })
     }
 
+    // Obtener bucket disponible (selección automática multi-cuenta)
+    const { accountNumber, bucketName, publicUrl } = await getAvailableBucket()
+
+    // Obtener cliente R2 para la cuenta seleccionada
+    const r2Client = getR2ClientForAccount(accountNumber)
+
     const key = `${randomUUID()}-${filename}`
 
     const command = new PutObjectCommand({
-      Bucket: CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: bucketName,
       Key: key,
       ContentType: contentType,
     })
 
-    const url = await getSignedUrl(r2, command, { expiresIn: 3600 })
+    const url = await getSignedUrl(r2Client, command, { expiresIn: 3600 })
 
-    const publicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL
-    if (!publicUrl) {
-      return NextResponse.json({ error: "Missing Cloudflare R2 public URL configuration" }, { status: 500 })
-    }
-
-    return NextResponse.json({ 
+    return NextResponse.json({
       url,
-      downloadUrl: `${publicUrl}/${key}` 
+      downloadUrl: `${publicUrl}/${key}`,
+      accountNumber, // Importante: el frontend necesita esto para guardar en DB
     })
   } catch (error) {
     console.error("Error generating signed URL:", error)
