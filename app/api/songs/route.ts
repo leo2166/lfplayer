@@ -8,13 +8,10 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3"
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    // Allow public access (RLS policies will handle security defined in scripts/009_add_public_songs_policy.sql)
+    // const { data: { user } } = await supabase.auth.getUser()
+    // if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const genre_id = request.nextUrl.searchParams.get("genre_id")
 
@@ -29,7 +26,7 @@ export async function GET(request: NextRequest) {
         genre_id,
         genres (id, name, color)
       `)
-      .eq("user_id", user.id)
+      // .eq("user_id", user.id) // Removed to allow guest access
       .order("created_at", { ascending: false })
 
     if (genre_id && genre_id !== "all") {
