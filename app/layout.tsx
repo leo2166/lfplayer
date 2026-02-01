@@ -44,14 +44,19 @@ export const viewport = {
   colorScheme: 'dark light',
 };
 
+import { redirect } from "next/navigation"
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Lógica de Mantenimiento
+  const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
+
   return (
-    <html lang="es">
-      <body className={`${_geist.className} font-sans antialiased`}>
+    <html lang="es" className="dark">
+      <body className={`${_geist.className} font-sans antialiased text-white bg-[#0a0a0c]`}>
         <MusicPlayerProvider>
           {children}
           <GlobalMusicPlayer />
