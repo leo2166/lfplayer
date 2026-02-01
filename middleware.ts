@@ -29,6 +29,16 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Lógica de Mantenimiento
+  const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
+  const isMaintenancePath = request.nextUrl.pathname === "/maintenance";
+
+  if (isMaintenanceMode && !isMaintenancePath && !request.nextUrl.pathname.startsWith('/api')) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/maintenance";
+    return NextResponse.redirect(url);
+  }
+
   // Redirect to app if accessing auth pages while logged in
   if ((request.nextUrl.pathname.startsWith("/auth") || request.nextUrl.pathname === "/") && user) {
     const url = request.nextUrl.clone()
