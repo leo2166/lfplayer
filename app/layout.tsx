@@ -51,8 +51,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Lógica de Mantenimiento
-  const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
+  // Lógica de Mantenimiento - DESACTIVADO
+  // const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
 
   return (
     <html lang="es" className="dark">
