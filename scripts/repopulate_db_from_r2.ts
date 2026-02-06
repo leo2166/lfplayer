@@ -6,7 +6,7 @@ import readline from "readline"
 
 // Hardcoded fallbacks para evitar errores de lectura de .env en ejecución con npx
 const HARDCODED_ENVS = {
-    NEXT_PUBLIC_SUPABASE_URL: "https://wtbszhzcisxoswfvbzen.supabase.co",
+    NEXT_PUBLIC_SUPABASE_URL: "https://wtbszhzcisxoswfvbaen.supabase.co",
     CLOUDFLARE_R2_ACCOUNT_ID: "2e4ce46b69496d4672be6e105ad32329",
     CLOUDFLARE_R2_ACCESS_KEY_ID: "ccd6358464255b0802d99a9dc2104789",
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: "c6e13017eb54138a3bc2c6c2cd37da5dcd748338d1a08f0fa5c13266ca866b11",
@@ -91,6 +91,84 @@ async function repopulate() {
         return
     }
 
+    // ---------------------------------------------------------
+    // 1. Obtener o Crear un Usuario de Sistema
+    // ---------------------------------------------------------
+    let globalUserId = '00000000-0000-0000-0000-000000000000'
+    try {
+        const { data: { users }, error: userError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1 })
+        if (users && users.length > 0) {
+            globalUserId = users[0].id
+            console.log(`✅ Usando User ID existente para todas las canciones: ${globalUserId}`)
+        } else {
+            console.log("⚠️ No se encontraron usuarios en auth.users.")
+            console.log("🛠️ Intentando crear usuario de sistema 'system@lfplayer.local'...")
+
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+                email: 'system@lfplayer.local',
+                password: 'InitialPassword123!',
+                email_confirm: true
+            })
+
+            if (newUser && newUser.user) {
+                globalUserId = newUser.user.id
+                console.log(`✅ Usuario de sistema creado exitosamente: ${globalUserId}`)
+            } else {
+                console.warn(`❌ Falló la creación automática: ${createError?.message}`)
+                globalUserId = await askQuestion("   🆔 Por favor ingresa un User ID válido (UUID) para asociar las canciones: ")
+            }
+        }
+    } catch (e) {
+        console.warn("⚠️ Error gestionando usuario:", e)
+    }
+
+    // Cache para evitar consultar géneros repetidamente
+    const genreCache = new Map<string, string>(); // Nombre -> UUID
+
+    /**
+     * Helper para obtener o crear género
+     */
+    async function getOrInsertGenre(genreName: string): Promise<string | null> {
+        const normalized = genreName.trim();
+        if (!normalized) return null;
+
+        // 1. Buscar en cache local
+        if (genreCache.has(normalized.toLowerCase())) {
+            return genreCache.get(normalized.toLowerCase())!;
+        }
+
+        // 2. Buscar en BD
+        const { data: existing } = await supabase
+            .from('genres')
+            .select('id')
+            .ilike('name', normalized)
+            .maybeSingle();
+
+        if (existing) {
+            genreCache.set(normalized.toLowerCase(), existing.id);
+            return existing.id;
+        }
+
+        // 3. Crear si no existe
+        const { data: created, error } = await supabase
+            .from('genres')
+            .insert({ name: normalized })
+            .select('id')
+            .single();
+
+        if (error) {
+            console.error(`   ⚠️ Error creando género '${normalized}':`, error.message);
+            return null;
+        }
+
+        if (created) {
+            console.log(`   ✨ Nuevo género creado: ${normalized}`);
+            genreCache.set(normalized.toLowerCase(), created.id);
+            return created.id;
+        }
+        return null;
+    }
+
     // Configuración R2 (Prioridad: variables inyectadas > archivo multi-cuenta > .env.local)
     const accounts = [
         {
@@ -166,23 +244,42 @@ async function repopulate() {
                         continue
                     }
 
-                    // Inferir metadatos
+                    // ---------------------------------------------------------
+                    // LOGICA DE METADATOS (Género / Artista / Canción)
+                    // ---------------------------------------------------------
                     let title = item.Key
                     let artist = "Desconocido"
+                    let genreId: string | null = null;
 
-                    // Limpiar UUID prefijo (asumiendo uuid-nombre)
-                    // Intenta detectar patrón UUID estándar al inicio
-                    const uuidPattern = /^[0-9a-fA-F-]{36}-/
-                    const cleanName = item.Key.replace(uuidPattern, '')
+                    const parts = item.Key.split('/');
 
-                    const nameWithoutExt = cleanName.replace(/\.[^/.]+$/, "")
+                    // Caso ideal: Género / Artista / Canción.mp3
+                    if (parts.length >= 3) {
+                        const rawGenre = parts[0];
+                        const rawArtist = parts[1];
+                        const fileName = parts[parts.length - 1]; // Siempre el último es el archivo
 
-                    if (nameWithoutExt.includes(' - ')) {
-                        const parts = nameWithoutExt.split(' - ')
-                        artist = parts[0].trim()
-                        title = parts.slice(1).join(' - ').trim()
-                    } else {
-                        title = nameWithoutExt
+                        artist = rawArtist;
+                        title = fileName;
+                        genreId = await getOrInsertGenre(rawGenre);
+                    }
+                    // Caso intermedio: Género / Canción.mp3 (Artista deducido)
+                    else if (parts.length === 2) {
+                        const rawGenre = parts[0];
+                        const fileName = parts[1];
+                        title = fileName;
+                        genreId = await getOrInsertGenre(rawGenre);
+                    }
+
+                    // Limpieza final del Título y Artista (quitar extensiones y UUIDs si sobran)
+                    const uuidPattern = /^[0-9a-fA-F-]{36}-/;
+                    title = title.replace(uuidPattern, '').replace(/\.[^/.]+$/, "");
+
+                    // Si el nombre de archivo aun tiene "Artista - Titulo", intentar parsear
+                    if (title.includes(' - ') && artist === "Desconocido") {
+                        const splitName = title.split(' - ');
+                        artist = splitName[0].trim();
+                        title = splitName.slice(1).join(' - ').trim();
                     }
 
                     const blobUrl = `${account.publicUrl}/${item.Key}`
@@ -191,17 +288,19 @@ async function repopulate() {
                     const { error } = await supabase.from('songs').insert({
                         title: title,
                         artist: artist,
+                        genre_id: genreId,
                         blob_url: blobUrl,
                         storage_account_number: account.number,
                         duration: 0,
-                        user_id: '00000000-0000-0000-0000-000000000000'
+                        user_id: globalUserId
                     })
 
                     if (error) {
                         console.error(`   ❌ Error insertando ${item.Key}:`, error.message)
                         totalErrors++
                     } else {
-                        console.log(`   ✅ Recuperado: ${title} (${artist})`)
+                        const genreLog = genreId ? `[G: ${parts[0]}]` : '';
+                        console.log(`   ✅ Recuperado: ${title} (${artist}) ${genreLog}`)
                         totalImported++
                     }
                 }

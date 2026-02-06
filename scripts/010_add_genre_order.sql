@@ -13,6 +13,9 @@ UPDATE genres SET display_order = 8 WHERE name = 'Urbana';
 UPDATE genres SET display_order = 9 WHERE name = 'Tecno';
 UPDATE genres SET display_order = 10 WHERE name = 'Moderna';
 UPDATE genres SET display_order = 11 WHERE name = 'Pop';
+UPDATE genres SET display_order = 12 WHERE name = 'Musica Venezolana';
+UPDATE genres SET display_order = 13 WHERE name = 'Vallenatos';
+UPDATE genres SET display_order = 14 WHERE name = 'La hora loca';
 
 -- Los géneros que no estén en la lista tendrán display_order = 999 y aparecerán al final
 -- ordenados alfabéticamente

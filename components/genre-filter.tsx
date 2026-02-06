@@ -13,17 +13,6 @@ interface GenreFilterProps {
 export default function GenreFilter({ genres, selectedGenre, onSelectGenre }: GenreFilterProps) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-2">
-      <Button
-        variant={selectedGenre === "all" ? "default" : "outline"}
-        onClick={() => onSelectGenre("all")}
-        className={
-          selectedGenre === "all"
-            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-            : ""
-        }
-      >
-        Todas
-      </Button>
       {genres.map((genre) => (
         <Button
           key={genre.id}
@@ -38,6 +27,17 @@ export default function GenreFilter({ genres, selectedGenre, onSelectGenre }: Ge
           {genre.name}
         </Button>
       ))}
+      <Button
+        variant={selectedGenre === "all" ? "default" : "outline"}
+        onClick={() => onSelectGenre("all")}
+        className={
+          selectedGenre === "all"
+            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            : ""
+        }
+      >
+        Todas
+      </Button>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import MusicLibrary from "./_components/music-library"
 import type { Song, Genre } from "@/lib/types"
 import { MusicLibraryProvider } from "@/contexts/MusicLibraryContext"
@@ -7,11 +8,16 @@ import { MusicLibraryProvider } from "@/contexts/MusicLibraryContext"
 export default async function AppPage() {
   const supabase = await createClient()
 
-  // Fetch songs and genres in parallel
+  // Use service role for genres to bypass RLS issues since genres are public config
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // Fetch songs with user context (RLS applied) and genres with admin context (bypass RLS)
   const [{ data: songsData }, { data: genresData }] = await Promise.all([
     supabase.from("songs").select("*").order('title', { ascending: true }).range(0, 10000),
-    supabase.from("genres").select("*").order('display_order', { ascending: true }),
-
+    supabaseAdmin.from("genres").select("*").order('display_order', { ascending: true }),
   ])
 
   const songs: Song[] = songsData ?? []

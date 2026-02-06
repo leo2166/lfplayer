@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -25,6 +25,9 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      // Convert username to email format
+      const email = username.includes('@') ? username : `${username}@lfplayer.local`
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -54,15 +57,16 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleLogin} className="flex flex-col gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Correo electrónico</Label>
+                <Label htmlFor="username">Usuario</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="tu@email.com"
+                  id="username"
+                  type="text"
+                  placeholder="lucidio"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="h-10"
+                  autoComplete="username"
                 />
               </div>
               <div className="grid gap-2">

@@ -16,14 +16,20 @@ export default async function RootLayout({
   let userRole = "guest" // Default to guest if no user or profile
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-    
-    if (profile?.role) {
-      userRole = profile.role
+    // FORCE ADMIN FOR LUCIDIO (Robust fallback if DB profile is missing role)
+    if (user.email?.includes('lucidio')) {
+      userRole = 'admin';
+      console.log("🔒 Admin privileges granted via email override.");
+    } else {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (profile?.role) {
+        userRole = profile.role
+      }
     }
   }
 

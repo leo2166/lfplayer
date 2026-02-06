@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Upload, Music, AlertCircle, FileCheck, FileX, Loader2, CheckCircle2, XCircle } from "lucide-react"
+import { Upload, Music, AlertCircle, FileCheck, FileX, Loader2, CheckCircle2, XCircle, Folder } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -96,21 +96,58 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     setError(null);
     setUploadStatuses([]);
 
-    // FILTER LOGIC
+    // FILTER LOGIC - Solo archivos con extensión .mp3 (case-insensitive)
     const validFiles = allFiles.filter(f =>
-      f.type === 'audio/mpeg' || f.name.toLowerCase().endsWith('.mp3')
+      f.name.toLowerCase().endsWith('.mp3')
     );
     const ignoredCount = allFiles.length - validFiles.length;
 
-    // Update stats
+    // DETECCIÓN DE DUPLICADOS dentro de la misma carpeta
+    const filesByFolder = new Map<string, Set<string>>();
+    const deduplicatedFiles: File[] = [];
+    let duplicateCount = 0;
+
+    for (const file of validFiles) {
+      // Extraer la ruta de la carpeta (sin el nombre del archivo)
+      const folderPath = file.webkitRelativePath
+        ? file.webkitRelativePath.substring(0, file.webkitRelativePath.lastIndexOf('/'))
+        : 'root'; // Si no hay webkitRelativePath, usar 'root'
+
+      // Normalizar el nombre del archivo a minúsculas para comparación
+      const normalizedFileName = file.name.toLowerCase();
+
+      // Crear el Set para esta carpeta si no existe
+      if (!filesByFolder.has(folderPath)) {
+        filesByFolder.set(folderPath, new Set<string>());
+      }
+
+      const filesInFolder = filesByFolder.get(folderPath)!;
+
+      // Si ya existe en esta carpeta, es un duplicado
+      if (filesInFolder.has(normalizedFileName)) {
+        duplicateCount++;
+        continue; // Saltar este archivo
+      }
+
+      // Agregar a la lista de archivos de esta carpeta
+      filesInFolder.add(normalizedFileName);
+      deduplicatedFiles.push(file);
+    }
+
+    // Update stats (ahora incluye duplicados detectados)
     setUploadStats({
       total: allFiles.length,
-      valid: validFiles.length,
-      ignored: ignoredCount
+      valid: deduplicatedFiles.length,
+      ignored: ignoredCount + duplicateCount
     });
 
-    // Update component's state with ONLY valid files.
-    setFiles(validFiles);
+    // Update component's state with ONLY deduplicated files.
+    setFiles(deduplicatedFiles);
+
+    // Mostrar mensaje informativo si hay duplicados
+    if (duplicateCount > 0) {
+      toast.warning(`Se encontraron ${duplicateCount} archivos duplicados en las mismas carpetas y fueron omitidos.`);
+    }
 
     // If folder upload, automatically extract artist name from the relative path.
     if (uploadMode === 'folder') {
@@ -166,9 +203,27 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         if (!file.name.toLowerCase().endsWith(".mp3")) throw new Error("Formato de archivo no válido. Solo se admiten MP3.");
         if (!genre_id) throw new Error("Género no seleccionado.");
-        if (!artistNameInput.trim()) throw new Error("Artista no especificado.");
 
-        updateStatus(currentFileName, 'Subiendo a R2...', 'Paso 1/4: Obteniendo URL firmada', 'text-purple-600');
+        // LÓGICA DE ARTISTA INTELIGENTE
+        // Si estamos en modo carpeta, intentamos deducir el artista de la estructura de directorios
+        let finalArtistName = artistNameInput.trim();
+
+        if (uploadMode === 'folder' && file.webkitRelativePath) {
+          const pathParts = file.webkitRelativePath.split('/');
+          // Estructura esperada:
+          // A) Colección/Artista/Song.mp3 (Length >= 3) -> Artista = pathParts[1]
+          // B) Artista/Song.mp3 (Length == 2) -> Artista = pathParts[0]
+
+          if (pathParts.length >= 3) {
+            finalArtistName = pathParts[1];
+          } else if (pathParts.length === 2) {
+            finalArtistName = pathParts[0];
+          }
+        }
+
+        if (!finalArtistName) throw new Error("Artista no especificado.");
+
+        updateStatus(currentFileName, 'Subiendo a R2...', `Artista: ${finalArtistName} | Paso 1/4: Obteniendo URL`, 'text-purple-600');
         log(`[${currentFileName}] Solicitando URL firmada...`);
         const presignResponse = await fetch("/api/upload", {
           method: "POST",
@@ -259,7 +314,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         const songData = {
           title: currentFileName.replace(/\.mp3$/i, ""),
-          artist: artistNameInput.trim(),
+          artist: finalArtistName,
           genre_id,
           blob_url: downloadUrl,
           duration,
@@ -387,18 +442,26 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
           </div>
         ) : (
           <div>
-            <Label htmlFor="artistName">Nombre del Artista *</Label>
-            <Input
-              id="artistName"
-              value={artistNameInput}
-              onChange={(e) => setArtistNameInput(e.target.value)}
-              placeholder="Escribe el nombre del artista"
-              className="mt-1"
-            />
-            {uploadMode === 'folder' && artistNameInput && (
-              <p className="text-xs text-green-600 mt-1 font-medium">
-                Detectado desde carpeta: {artistNameInput}
-              </p>
+            <Label htmlFor="artistName">Nombre del Artista</Label>
+            {uploadMode === 'files' ? (
+              <Input
+                id="artistName"
+                value={artistNameInput}
+                onChange={(e) => setArtistNameInput(e.target.value)}
+                placeholder="Escribe el nombre del artista"
+                className="mt-1"
+              />
+            ) : (
+              <div className="mt-1 p-3 bg-muted rounded-md border border-border">
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Folder className="w-4 h-4" />
+                  <span>
+                    El artista se detectará automáticamente del nombre de cada carpeta.
+                    <br />
+                    <span className="text-xs opacity-70">Ej: "Marc Anthony/Vivir.mp3" → Artista: Marc Anthony</span>
+                  </span>
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -410,7 +473,40 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
               <SelectValue placeholder="Selecciona un género" />
             </SelectTrigger>
             <SelectContent>
-              {genres.sort((a, b) => a.name.localeCompare(b.name)).map((genre) => (
+              {genres.sort((a, b) => {
+                // Orden personalizado de los 14 géneros principales
+                const genreOrder = [
+                  "Romántica En Español",
+                  "Romántica en Ingles",
+                  "Merengues",
+                  "Salsa",
+                  "Guaracha",
+                  "Gaita Zuliana",
+                  "Clásica",
+                  "Urbana",
+                  "Tecno",
+                  "Moderna",
+                  "Pop",
+                  "Musica Venezolana",
+                  "Vallenatos",
+                  "La hora loca"
+                ];
+
+                const indexA = genreOrder.indexOf(a.name);
+                const indexB = genreOrder.indexOf(b.name);
+
+                // Si ambos están en la lista personalizada, ordenar por índice
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+
+                // Si solo A está en la lista, A va primero
+                if (indexA !== -1) return -1;
+
+                // Si solo B está en la lista, B va primero
+                if (indexB !== -1) return 1;
+
+                // Si ninguno está en la lista, ordenar alfabéticamente
+                return a.name.localeCompare(b.name);
+              }).map((genre) => (
                 <SelectItem key={genre.id} value={genre.id}>
                   {genre.name}
                 </SelectItem>
@@ -469,7 +565,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
               {uploadStats.ignored > 0 && (
                 <p className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded flex items-center gap-2">
                   <AlertCircle className="w-3 h-3" />
-                  Se ignorarán {uploadStats.ignored} archivos que no son MP3.
+                  Se ignorarán {uploadStats.ignored} archivos (no-MP3 o duplicados en la misma carpeta).
                 </p>
               )}
             </div>

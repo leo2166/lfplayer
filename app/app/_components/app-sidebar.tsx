@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Music, X, ListMusic, PlusCircle, LogOut } from "lucide-react"
+import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp } from "lucide-react"
 import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -20,6 +20,8 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     const userRole = useUserRole()
     const { closePlayer } = useMusicPlayer()
     const router = useRouter()
+
+    const isActive = (path: string) => pathname === path
 
     const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -94,19 +96,23 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
 
                     {/* Add Music Button */}
                     {userRole === 'admin' && (
-                        <button
-                            onClick={() => {
-                                onOpenAddMusic()
-                                onClose()
-                            }}
-                            className={cn(
-                                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
-                                "text-muted-foreground hover:text-foreground hover:bg-accent",
-                            )}
-                        >
-                            <PlusCircle className="w-5 h-5 flex-shrink-0" />
-                            <span className="font-medium">Agregar Música</span>
-                        </button>
+                        <>
+
+
+                            <button
+                                onClick={() => {
+                                    onOpenAddMusic()
+                                    onClose()
+                                }}
+                                className={cn(
+                                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+                                    "text-muted-foreground hover:text-foreground hover:bg-accent",
+                                )}
+                            >
+                                <PlusCircle className="w-5 h-5 flex-shrink-0" />
+                                <span className="font-medium">Agregar Música</span>
+                            </button>
+                        </>
                     )}
 
                     {/* Sign Out Button */}
