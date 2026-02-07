@@ -5,7 +5,7 @@ import { ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 
 async function getOrphanKeys() {
-    console.log(`[ORPHAN CHECK] Starting orphan check for user: ${userId}`);
+    console.log(`[ORPHAN CHECK] Starting orphan check (GLOBAL SCOPE)`);
 
     // 1. Get all file keys from Cloudflare R2
     let isTruncated = true;

@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 
 // Helper function to find broken links
 async function findBrokenSupabaseRecords() {
-    console.log(`[BROKEN LINKS] Starting broken links check for user: ${userId}`);
+    console.log(`[BROKEN LINKS] Starting broken links check (GLOBAL SCOPE)`);
 
     // 1. Get all file keys from Cloudflare R2
     let isTruncated = true;
