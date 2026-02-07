@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 // Helper function to find broken links
-async function findBrokenSupabaseRecords(userId: string) {
+async function findBrokenSupabaseRecords() {
     console.log(`[BROKEN LINKS] Starting broken links check for user: ${userId}`);
 
     // 1. Get all file keys from Cloudflare R2
@@ -33,17 +33,17 @@ async function findBrokenSupabaseRecords(userId: string) {
 
     console.log(`[BROKEN LINKS] Total files in R2: ${r2FileKeys.size}`);
 
-    // 2. Get songs ONLY from the current user
+    // 2. Get all songs (Global cleanup)
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
         .select('id, title, artist, blob_url')
-        .eq('user_id', userId);
+        .range(0, 9999);
 
     if (dbError) {
         throw new Error(`Error de base de datos: ${dbError.message}`);
     }
 
-    console.log(`[BROKEN LINKS] Total songs for user ${userId}: ${songs.length}`);
+    console.log(`[BROKEN LINKS] Total songs in DB: ${songs.length}`);
 
     const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
     if (!r2PublicUrl) {
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
         }
 
-        const { brokenRecords, totalR2Files, totalSupabaseSongs } = await findBrokenSupabaseRecords(user.id);
+        const { brokenRecords, totalR2Files, totalSupabaseSongs } = await findBrokenSupabaseRecords();
 
         return NextResponse.json({
             message: 'Análisis de registros rotos completado.',
@@ -117,7 +117,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
         }
 
-        const { brokenRecords } = await findBrokenSupabaseRecords(user.id);
+        const { brokenRecords } = await findBrokenSupabaseRecords();
 
         if (brokenRecords.length === 0) {
             return NextResponse.json({ message: "No se encontraron registros rotos para eliminar." });

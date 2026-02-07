@@ -4,7 +4,7 @@ import { r2 } from '@/lib/cloudflare/r2';
 import { ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 
-async function getOrphanKeys(userId: string) {
+async function getOrphanKeys() {
     console.log(`[ORPHAN CHECK] Starting orphan check for user: ${userId}`);
 
     // 1. Get all file keys from Cloudflare R2
@@ -31,17 +31,18 @@ async function getOrphanKeys(userId: string) {
 
     console.log(`[ORPHAN CHECK] Total files in R2: ${r2FileKeys.size}`);
 
-    // 2. Get blob_urls ONLY from the current user's songs
+    // 2. Get all songs (Global cleanup)
+    // Using range to bypass default 1000 row limit
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
         .select('blob_url, title, artist')
-        .eq('user_id', userId);
+        .range(0, 9999);
 
     if (dbError) {
         throw new Error(`Error de base de datos: ${dbError.message}`);
     }
 
-    console.log(`[ORPHAN CHECK] Total songs for user ${userId}: ${songs.length}`);
+    console.log(`[ORPHAN CHECK] Total songs in DB: ${songs.length}`);
 
     const supabaseFileKeys = new Set<string>();
     const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
         }
 
-        const { orphanKeys, totalR2Files, totalSupabaseFiles } = await getOrphanKeys(user.id);
+        const { orphanKeys, totalR2Files, totalSupabaseFiles } = await getOrphanKeys();
 
         return NextResponse.json({
             message: 'Análisis de archivos huérfanos completado.',
@@ -111,7 +112,7 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
         }
 
-        const { orphanKeys } = await getOrphanKeys(user.id);
+        const { orphanKeys } = await getOrphanKeys();
 
         if (orphanKeys.length === 0) {
             return NextResponse.json({ message: "No se encontraron archivos huérfanos para eliminar." });
