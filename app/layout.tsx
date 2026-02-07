@@ -44,6 +44,7 @@ export const viewport = {
   colorScheme: 'dark light',
 };
 
+import { Providers } from "./providers"
 import { redirect } from "next/navigation"
 
 export default function RootLayout({
@@ -55,13 +56,15 @@ export default function RootLayout({
   // const isMaintenanceMode = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true";
 
   return (
-    <html lang="es" className="dark">
-      <body className={`${_geist.className} font-sans antialiased text-white bg-[#0a0a0c]`}>
-        <MusicPlayerProvider>
-          {children}
-          <GlobalMusicPlayer />
-          <Analytics />
-        </MusicPlayerProvider>
+    <html lang="es" suppressHydrationWarning>
+      <body className={`${_geist.className} font-sans antialiased text-foreground bg-background`}>
+        <Providers>
+          <MusicPlayerProvider>
+            {children}
+            <GlobalMusicPlayer />
+            <Analytics />
+          </MusicPlayerProvider>
+        </Providers>
       </body>
     </html>
   )

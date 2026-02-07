@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp } from "lucide-react"
+import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp, Sun, Moon } from "lucide-react"
+import { useTheme } from "next-themes"
 import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -20,6 +21,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     const userRole = useUserRole()
     const { closePlayer } = useMusicPlayer()
     const router = useRouter()
+    const { theme, setTheme } = useTheme()
 
     const isActive = (path: string) => pathname === path
 
@@ -115,8 +117,27 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                         </>
                     )}
 
+                    {/* Theme Toggle */}
+                    <div className="pt-2">
+                        <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+                                "text-muted-foreground hover:text-foreground hover:bg-accent",
+                            )}
+                        >
+                            <div className="relative w-5 h-5 flex-shrink-0">
+                                <Sun className="w-5 h-5 absolute rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-orange-500" />
+                                <Moon className="w-5 h-5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
+                            </div>
+                            <span className="font-medium">
+                                {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
+                            </span>
+                        </button>
+                    </div>
+
                     {/* Sign Out Button */}
-                    <div className="pt-4 mt-4 border-t border-border">
+                    <div className="pt-2 border-t border-border">
                         <button
                             onClick={handleSignOut}
                             className={cn(
