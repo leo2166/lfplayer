@@ -334,7 +334,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
 
         updateStatus(currentFileName, 'Subiendo a R2...', `Artista: ${finalArtistName} | Paso 1/4: Obteniendo URL`, 'text-purple-600');
 
-        // ... (Same upload logic as before) ...
+        // Get presigned URL
         const presignResponse = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -343,9 +343,34 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
         const { url, downloadUrl, accountNumber } = await presignResponse.json();
 
-        // Upload to R2
-        const uploadResponse = await fetch(url, { method: "PUT", body: file });
-        if (!uploadResponse.ok) throw new Error(`Error al subir a R2 (${uploadResponse.status})`);
+        // Upload to R2 with progress tracking using XMLHttpRequest
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', url, true);
+
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              const loadedMB = (event.loaded / 1048576).toFixed(1);
+              const totalMB = (event.total / 1048576).toFixed(1);
+              updateStatus(currentFileName, 'Subiendo a R2...', `Subiendo... ${percent}% (${loadedMB}/${totalMB} MB)`, 'text-purple-600');
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Error al subir a R2 (${xhr.status})`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Error de red al subir el archivo. Verifica tu conexión.'));
+          xhr.ontimeout = () => reject(new Error('Tiempo de espera agotado al subir el archivo.'));
+          xhr.timeout = 600000; // 10 minutos para archivos grandes
+
+          xhr.send(file);
+        });
 
         // Metadata
         const audio = new Audio(downloadUrl);

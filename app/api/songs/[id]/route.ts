@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { r2 } from '@/lib/cloudflare/r2';
+import { getR2ClientForAccount, getAccountNumberFromUrl, getBucketConfig, updateBucketUsage } from '@/lib/cloudflare/r2-manager';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -33,7 +33,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     // 2. Get the song's blob_url from Supabase
     const { data: song, error: dbError } = await supabaseAdmin
       .from('songs')
-      .select('id, blob_url')
+      .select('id, blob_url, storage_account_number')
       .eq('id', songId)
       .single();
 
@@ -42,26 +42,34 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Canción no encontrada o error en la base de datos.' }, { status: 404 });
     }
 
-    // 3. Delete file from Cloudflare R2 (if it exists and is an R2 URL)
+    // 3. Delete file from Cloudflare R2 (multi-account aware)
     if (song.blob_url) {
-      const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
-      if (r2PublicUrl && song.blob_url.startsWith(r2PublicUrl)) {
-        // Extract the key by removing the public URL prefix
-        let key = song.blob_url.substring(r2PublicUrl.length);
-        // Ensure no leading slash if r2PublicUrl ends without one and key starts with one
-        const finalKey = key.startsWith('/') ? key.substring(1) : key;
+      try {
+        const accountNumber = getAccountNumberFromUrl(song.blob_url) as 1 | 2;
+        const r2Client = getR2ClientForAccount(accountNumber);
+        const bucketConfig = getBucketConfig(accountNumber);
 
-        if (finalKey) { // Check if key is not empty
-          const deleteParams = {
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
-            Key: finalKey,
-          };
-          await r2.send(new DeleteObjectCommand(deleteParams));
-        } else {
-          console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
+        if (song.blob_url.startsWith(bucketConfig.publicUrl)) {
+          let key = song.blob_url.substring(bucketConfig.publicUrl.length);
+          const finalKey = key.startsWith('/') ? key.substring(1) : key;
+
+          if (finalKey) {
+            await r2Client.send(new DeleteObjectCommand({
+              Bucket: bucketConfig.bucketName,
+              Key: finalKey,
+            }));
+            console.log(`Successfully deleted object from R2 account ${accountNumber}: ${finalKey}`);
+
+            // Update storage usage
+            await updateBucketUsage(accountNumber, -4194304); // -4MB estimate
+          } else {
+            console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
+          }
         }
+      } catch (r2Error) {
+        console.error("Error deleting from R2:", r2Error);
+        // Continue with DB deletion even if R2 fails
       }
-      // Note: We are not handling deletion of Supabase storage files here as per user request to deprecate it.
     }
 
     // 4. Delete the song record from Supabase

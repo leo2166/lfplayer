@@ -47,6 +47,7 @@ export default function MusicLibrary() {
   const [loadingPlaylistId, setLoadingPlaylistId] = useState<string | null>(null)
 
   const [deletingArtist, setDeletingArtist] = useState<string | null>(null)
+  const [artistToDelete, setArtistToDelete] = useState<string | null>(null)
   const [deletingSong, setDeletingSong] = useState<Song | null>(null)
   const [hasMounted, setHasMounted] = useState(false)
   const [isAddIndividualMusicOpen, setAddIndividualMusicOpen] = useState(false)
@@ -151,8 +152,10 @@ export default function MusicLibrary() {
     }
   }
 
-  const handleDeleteArtist = async (artist: string) => {
-    if (deletingArtist === artist) return;
+  const confirmDeleteArtist = async () => {
+    const artist = artistToDelete;
+    if (!artist || deletingArtist === artist) return;
+    setArtistToDelete(null);
     setDeletingArtist(artist);
     const toastId = toast.loading(`Eliminando artista '${artist}'...`);
     try {
@@ -423,7 +426,7 @@ export default function MusicLibrary() {
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteArtist(artist);
+                        setArtistToDelete(artist);
                       }}
                       disabled={deletingArtist === artist}
                       className="h-8 w-8"
@@ -661,6 +664,29 @@ export default function MusicLibrary() {
               className="bg-destructive hover:bg-destructive/90"
             >
               Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Artist/Folder Confirmation Dialog */}
+      <AlertDialog open={!!artistToDelete} onOpenChange={(open) => !open && setArtistToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar carpeta "{artistToDelete}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es irreversible. Se eliminarán permanentemente todas las canciones
+              del artista <strong>{artistToDelete}</strong>, incluyendo los archivos de audio
+              en Cloudflare R2 y los registros en la base de datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteArtist}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Sí, eliminar todo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

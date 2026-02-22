@@ -1,41 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { r2 } from '@/lib/cloudflare/r2';
+import { getR2ClientForAccount, getBucketConfig } from '@/lib/cloudflare/r2-manager';
 import { ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 
 async function getOrphanKeys() {
-    console.log(`[ORPHAN CHECK] Starting orphan check (GLOBAL SCOPE)`);
+    console.log(`[ORPHAN CHECK] Starting orphan check (MULTI-ACCOUNT)`);
 
-    // 1. Get all file keys from Cloudflare R2
-    let isTruncated = true;
-    let continuationToken: string | undefined = undefined;
-    const r2FileKeys = new Set<string>();
-    const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
+    // 1. Get all file keys from BOTH Cloudflare R2 accounts
+    const r2FileKeys = new Map<string, { accountNumber: 1 | 2; bucketName: string }>();
 
-    while (isTruncated) {
-        const { Contents, IsTruncated, NextContinuationToken }: any = await r2.send(
-            new ListObjectsV2Command({
-                Bucket: bucketName,
-                ContinuationToken: continuationToken,
-            })
-        );
-        if (Contents) {
-            Contents.forEach((item: any) => {
-                if (item.Key) r2FileKeys.add(item.Key);
-            });
+    for (const accountNumber of [1, 2] as const) {
+        try {
+            const r2Client = getR2ClientForAccount(accountNumber);
+            const bucketConfig = getBucketConfig(accountNumber);
+            let isTruncated = true;
+            let continuationToken: string | undefined = undefined;
+
+            while (isTruncated) {
+                const { Contents, IsTruncated, NextContinuationToken }: any = await r2Client.send(
+                    new ListObjectsV2Command({
+                        Bucket: bucketConfig.bucketName,
+                        ContinuationToken: continuationToken,
+                    })
+                );
+                if (Contents) {
+                    Contents.forEach((item: any) => {
+                        if (item.Key) {
+                            r2FileKeys.set(`${accountNumber}:${item.Key}`, {
+                                accountNumber,
+                                bucketName: bucketConfig.bucketName,
+                            });
+                        }
+                    });
+                }
+                isTruncated = IsTruncated ?? false;
+                continuationToken = NextContinuationToken;
+            }
+            console.log(`[ORPHAN CHECK] Account ${accountNumber}: scanned bucket ${bucketConfig.bucketName}`);
+        } catch (error) {
+            console.error(`[ORPHAN CHECK] Error scanning account ${accountNumber}:`, error);
         }
-        isTruncated = IsTruncated ?? false;
-        continuationToken = NextContinuationToken;
     }
 
-    console.log(`[ORPHAN CHECK] Total files in R2: ${r2FileKeys.size}`);
+    console.log(`[ORPHAN CHECK] Total files across all R2 accounts: ${r2FileKeys.size}`);
 
     // 2. Get all songs (Global cleanup)
-    // Using range to bypass default 1000 row limit
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
-        .select('blob_url, title, artist')
+        .select('blob_url, title, artist, storage_account_number')
         .range(0, 9999);
 
     if (dbError) {
@@ -44,28 +57,44 @@ async function getOrphanKeys() {
 
     console.log(`[ORPHAN CHECK] Total songs in DB: ${songs.length}`);
 
-    const supabaseFileKeys = new Set<string>();
-    const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
-    if (!r2PublicUrl) {
-        throw new Error('La URL pública de R2 no está configurada.');
-    }
+    // 3. Build set of referenced keys (with account prefix)
+    const r2PublicUrl1 = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL || '';
+    const r2PublicUrl2 = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL_2 || '';
 
+    const supabaseFileKeys = new Set<string>();
     songs.forEach(song => {
-        if (song.blob_url && song.blob_url.startsWith(r2PublicUrl)) {
-            let key = song.blob_url.substring(r2PublicUrl.length);
-            const finalKey = key.startsWith('/') ? key.substring(1) : key;
-            if (finalKey) {
-                supabaseFileKeys.add(finalKey);
-            }
+        if (!song.blob_url) return;
+
+        let accountNumber: 1 | 2 = (song.storage_account_number || 1) as 1 | 2;
+        let key = '';
+
+        if (song.blob_url.startsWith(r2PublicUrl1)) {
+            key = song.blob_url.substring(r2PublicUrl1.length);
+            accountNumber = 1;
+        } else if (r2PublicUrl2 && song.blob_url.startsWith(r2PublicUrl2)) {
+            key = song.blob_url.substring(r2PublicUrl2.length);
+            accountNumber = 2;
+        } else {
+            return; // Unknown URL format, skip
+        }
+
+        const finalKey = key.startsWith('/') ? key.substring(1) : key;
+        if (finalKey) {
+            supabaseFileKeys.add(`${accountNumber}:${finalKey}`);
         }
     });
 
-    // 3. Compare the two sets to find orphans
-    const orphanKeys: string[] = [];
-    r2FileKeys.forEach(key => {
-        if (!supabaseFileKeys.has(key)) {
-            orphanKeys.push(key);
-            console.log(`[ORPHAN CHECK] Found orphan: ${key}`);
+    // 4. Find orphans: files in R2 not referenced by any song in DB
+    const orphanKeys: { key: string; accountNumber: 1 | 2; bucketName: string }[] = [];
+    r2FileKeys.forEach((value, compositeKey) => {
+        if (!supabaseFileKeys.has(compositeKey)) {
+            const actualKey = compositeKey.split(':').slice(1).join(':');
+            orphanKeys.push({
+                key: actualKey,
+                accountNumber: value.accountNumber,
+                bucketName: value.bucketName,
+            });
+            console.log(`[ORPHAN CHECK] Found orphan in account ${value.accountNumber}: ${actualKey}`);
         }
     });
 
@@ -91,7 +120,7 @@ export async function GET(req: NextRequest) {
             totalR2Files,
             totalSupabaseFiles,
             orphanFileCount: orphanKeys.length,
-            orphanKeys,
+            orphanKeys: orphanKeys.map(o => o.key),
         });
 
     } catch (error) {
@@ -118,36 +147,48 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ message: "No se encontraron archivos huérfanos para eliminar." });
         }
 
-        const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
-        const objectsToDelete = orphanKeys.map(key => ({ Key: key }));
-
-        // R2 delete can handle up to 1000 keys at a time
-        const promises = [];
-        for (let i = 0; i < objectsToDelete.length; i += 1000) {
-            const chunk = objectsToDelete.slice(i, i + 1000);
-            const deleteParams = {
-                Bucket: bucketName,
-                Delete: { Objects: chunk },
-            };
-            promises.push(r2.send(new DeleteObjectsCommand(deleteParams)));
+        // Group orphans by account
+        const orphansByAccount = new Map<number, { keys: string[]; bucketName: string }>();
+        for (const orphan of orphanKeys) {
+            if (!orphansByAccount.has(orphan.accountNumber)) {
+                orphansByAccount.set(orphan.accountNumber, { keys: [], bucketName: orphan.bucketName });
+            }
+            orphansByAccount.get(orphan.accountNumber)!.keys.push(orphan.key);
         }
 
-        const results = await Promise.allSettled(promises);
-
         let deletedCount = 0;
-        results.forEach((result, index) => {
-            if (result.status === 'fulfilled') {
-                const response: any = result.value;
-                if (response.Deleted) {
-                    deletedCount += response.Deleted.length;
-                }
-                if (response.Errors) {
-                    console.error(`Error eliminando un chunk de archivos:`, response.Errors);
-                }
-            } else {
-                console.error('Fallo una promesa de eliminación de chunk:', result.reason);
+
+        for (const [accountNumber, { keys, bucketName }] of orphansByAccount.entries()) {
+            const r2Client = getR2ClientForAccount(accountNumber as 1 | 2);
+            const objectsToDelete = keys.map(key => ({ Key: key }));
+
+            // R2 delete can handle up to 1000 keys at a time
+            const promises = [];
+            for (let i = 0; i < objectsToDelete.length; i += 1000) {
+                const chunk = objectsToDelete.slice(i, i + 1000);
+                promises.push(
+                    r2Client.send(new DeleteObjectsCommand({
+                        Bucket: bucketName,
+                        Delete: { Objects: chunk },
+                    }))
+                );
             }
-        });
+
+            const results = await Promise.allSettled(promises);
+            results.forEach((result) => {
+                if (result.status === 'fulfilled') {
+                    const response: any = result.value;
+                    if (response.Deleted) {
+                        deletedCount += response.Deleted.length;
+                    }
+                    if (response.Errors) {
+                        console.error(`Error eliminando archivos de cuenta ${accountNumber}:`, response.Errors);
+                    }
+                } else {
+                    console.error(`Fallo eliminación en cuenta ${accountNumber}:`, result.reason);
+                }
+            });
+        }
 
         return NextResponse.json({
             message: 'Limpieza de archivos huérfanos completada.',
