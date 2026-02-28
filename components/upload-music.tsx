@@ -220,8 +220,10 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       const path = (firstFile as any).path_override || firstFile.webkitRelativePath;
       if (path && path.includes('/')) {
         const parts = path.split('/');
-        // If dragging "Artist/Song.mp3", current input defaults to "Artist".
-        setArtistNameInput(parts[0]);
+        // El artista es siempre la carpeta que contiene directamente el MP3
+        // Ej: "Marc Anthony/cancion.mp3" -> "Marc Anthony"
+        // Ej: "SALSA/Marc Anthony/cancion.mp3" -> "Marc Anthony"
+        setArtistNameInput(parts[parts.length - 2]);
       }
     }
   };
@@ -278,55 +280,20 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         // This is critical for mass uploads of different folders
         let finalArtistName = artistNameInput.trim();
 
-        // Check file specific path
+        // Auto-detectar artista desde la ruta del archivo
+        // Regla: el artista es SIEMPRE la carpeta que contiene directamente el MP3
+        // Estructura soportada:
+        //   Artista/cancion.mp3              -> Artista
+        //   Genero/Artista/cancion.mp3       -> Artista
+        //   X/Genero/Artista/cancion.mp3     -> Artista
         const relativePath = (file as any).path_override || file.webkitRelativePath;
 
         if (relativePath && relativePath.includes('/')) {
           const pathParts = relativePath.split('/');
-          // E.g. "Marc Anthony/Vivir.mp3" -> pathParts ["Marc Anthony", "Vivir.mp3"] -> Artist: Marc Anthony
-          // E.g. "Music/Salsa/Marc Anthony/Vivir.mp3" -> Artist?
-
-          // Heuristic:
-          // 1. If length is 2 (Artist/Song), use part 0.
-          // 2. If length >= 3 (Collection/Artist/Song), use part 1 (assuming user dropped a collection folder).
-          // But if user dropped MULTIPLE folders directly (Artist A/..., Artist B/...), each file has path "Artist A/..." (len 2).
-
-          if (pathParts.length === 2) {
-            finalArtistName = pathParts[0];
-          } else if (pathParts.length >= 3) {
-            // If it looks like Collection/Artist/Song, take Artist.
-            // But what if it's Artist/Album/Song (len 3)? Then Artist is part 0.
-            // This is ambiguous. 
-            // Let's stick to the previous logic which seemed to favor part 1 for deep structures, 
-            // but let's prefer the "Folder Name" directly above the file? No, usually Artist is higher.
-
-            // Let's assume standard "Artist/Album/Song" or "Artist/Song" implies Artist is mostly dominant.
-            // User complaint suggests they want "Select Multiple Folders". 
-            // If I select "Marc", "Gilberto". 
-            // File 1: "Marc/Song1.mp3" -> Artist "Marc".
-            // File 2: "Gilberto/Song2.mp3" -> Artist "Gilberto".
-
-            // If I prioritize the TOP level folder for that specific file chain:
-            finalArtistName = pathParts[0];
-
-            // NOTE: Previous code used pathParts[1] for len >= 3. 
-            // If user organized as "Salsa/Marc/Song", then "Salsa" is [0], "Marc" is [1].
-            // If user drags "Salsa" folder, then [1] is correct.
-            // If user drags "Marc" and "Gilberto" folders directly, then they are [0].
-
-            // FIX: If we detected drag/multiple folders, we probably want the immediate parent of the tree?
-            // Let's check `artistNameInput`. If the user manually edited the input to "Various", we might respect it?
-            // But for "Mass Upload", auto-detection is key.
-
-            // Let's use a smarter heuristic:
-            // If the input field still matches the default detection (first folder name), then strictly use per-file folder [0].
-            // If user changed input, maybe they want to override?
-            // Actually, for mass upload, per-file is best.
-
-            // Reverting to robust check:
-            // If path has > 2 parts, check if part[0] is in our 'selection' list... too complex.
-            // Let's default to part[0] (Top Level Folder Name) for this mass upload feature change.
-            finalArtistName = pathParts[0];
+          // pathParts[last] = nombre del archivo
+          // pathParts[last-1] = carpeta padre directa = ARTISTA
+          if (pathParts.length >= 2) {
+            finalArtistName = pathParts[pathParts.length - 2];
           }
         }
 
