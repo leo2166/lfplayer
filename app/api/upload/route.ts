@@ -1,4 +1,4 @@
-import { getAvailableBucket, getR2ClientForAccount } from "@/lib/cloudflare/r2-manager"
+import { getAvailableBucket, getR2ClientForAccount, updateBucketUsage } from "@/lib/cloudflare/r2-manager"
 import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { type NextRequest, NextResponse } from "next/server"
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 })
     }
 
-    const { filename, contentType } = await request.json()
+    const { filename, contentType, fileSize } = await request.json()
 
     if (!filename || !contentType) {
       return NextResponse.json({ error: "Missing filename or contentType" }, { status: 400 })
@@ -47,6 +47,11 @@ export async function POST(request: NextRequest) {
     })
 
     const url = await getSignedUrl(r2Client, command, { expiresIn: 3600 })
+
+    // Actualizar el contador de uso para activar el failover cuando se llene la cuenta
+    if (fileSize && fileSize > 0) {
+      await updateBucketUsage(accountNumber, fileSize)
+    }
 
     return NextResponse.json({
       url,

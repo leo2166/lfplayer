@@ -93,17 +93,23 @@ export async function getAvailableBucket(): Promise<{
             if (bucket.current_usage_bytes < USAGE_THRESHOLD) {
                 const accountNumber = bucket.account_number as 1 | 2
                 const config = R2_ACCOUNTS[accountNumber]
+                const usageGB = (bucket.current_usage_bytes / 1073741824).toFixed(2)
+                const thresholdGB = (USAGE_THRESHOLD / 1073741824).toFixed(2)
+                console.log(`✅ Usando cuenta R2 #${accountNumber} (uso: ${usageGB} GB / ${thresholdGB} GB umbral)`)
 
                 return {
                     accountNumber,
                     bucketName: config.bucketName,
                     publicUrl: config.publicUrl,
                 }
+            } else {
+                const usageGB = (bucket.current_usage_bytes / 1073741824).toFixed(2)
+                console.warn(`⚠️  Cuenta R2 #${bucket.account_number} llena (${usageGB} GB). Buscando siguiente cuenta...`)
             }
         }
 
         // Si todas están llenas, usar la última (esto debería generar una alerta)
-        console.warn("⚠️ WARNING: All R2 accounts are near capacity!")
+        console.warn("🚨 CRÍTICO: Todas las cuentas R2 están al límite de capacidad!")
         return {
             accountNumber: 2,
             bucketName: R2_ACCOUNTS[2].bucketName,

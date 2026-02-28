@@ -338,7 +338,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
         const presignResponse = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: currentFileName, contentType: file.type }),
+          body: JSON.stringify({ filename: currentFileName, contentType: file.type, fileSize: file.size }),
         });
         if (!presignResponse.ok) throw new Error(`No se pudo obtener la URL de subida (${presignResponse.status})`);
         const { url, downloadUrl, accountNumber } = await presignResponse.json();
