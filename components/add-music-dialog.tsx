@@ -28,6 +28,7 @@ interface AddMusicDialogProps {
 
 export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, preselectedArtist, preselectedGenreId }: AddMusicDialogProps) {
   const [genres, setGenres] = useState<Genre[]>([])
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     // Fetch genres when the dialog is opened for the first time
@@ -47,25 +48,57 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, pr
 
   const handleSuccess = (songs: any[]) => {
     onUploadSuccess(songs)
-    // Optional: Close dialog on success
-    // onOpenChange(false)
+  }
+
+  // Block closing the dialog if an upload is in progress
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && isUploading) {
+      // User tried to close while uploading — block it
+      return
+    }
+    onOpenChange(newOpen)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+        // Prevent closing when clicking outside during upload
+        onInteractOutside={(e) => {
+          if (isUploading) {
+            e.preventDefault()
+          }
+        }}
+        // Prevent closing with Escape key during upload
+        onEscapeKeyDown={(e) => {
+          if (isUploading) {
+            e.preventDefault()
+          }
+        }}
+        // Hide the X close button during upload
+        {...(isUploading ? { hideCloseButton: true } : {})}
+      >
         <DialogHeader>
-          <DialogTitle>Agregar Nueva Música</DialogTitle>
+          <DialogTitle>
+            {isUploading ? "⏳ Subiendo Música — No cierres esta ventana" : "Agregar Nueva Música"}
+          </DialogTitle>
           <DialogDescription>
-            Sube uno o varios archivos de audio. Se les asignará el género que elijas.
+            {isUploading
+              ? "La subida está en progreso. Este diálogo está bloqueado hasta que termine."
+              : "Sube uno o varios archivos de audio. Se les asignará el género que elijas."
+            }
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4">
-          <UploadMusic genres={genres} onUploadSuccess={handleSuccess} preselectedArtist={preselectedArtist} preselectedGenreId={preselectedGenreId} />
+          <UploadMusic
+            genres={genres}
+            onUploadSuccess={handleSuccess}
+            preselectedArtist={preselectedArtist}
+            preselectedGenreId={preselectedGenreId}
+            onUploadingChange={setIsUploading}
+          />
         </div>
       </DialogContent>
     </Dialog>
   )
 }
-
-// Force re-build

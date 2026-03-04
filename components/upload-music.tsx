@@ -26,6 +26,7 @@ interface UploadMusicProps {
   onUploadSuccess?: (songs: any[]) => void
   preselectedArtist?: string
   preselectedGenreId?: string
+  onUploadingChange?: (isUploading: boolean) => void
 }
 
 interface UploadStatus {
@@ -46,7 +47,7 @@ interface FolderStatus {
   status: 'pending' | 'uploading' | 'verifying' | 'complete' | 'incomplete' | 'warning';
 }
 
-export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist, preselectedGenreId }: UploadMusicProps) {
+export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist, preselectedGenreId, onUploadingChange }: UploadMusicProps) {
   const [genre_id, setGenreId] = useState(preselectedGenreId || "")
   const [files, setFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -391,6 +392,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     setFolderStatuses([]);
 
     setIsLoading(true);
+    onUploadingChange?.(true);
     setUploadStatuses(files.map(f => ({ fileName: f.name, status: 'Pendiente', message: 'En espera para procesar', color: 'text-muted-foreground' })));
 
     // ── STEP 1: Group files by folder ──────────────────────────────────────
@@ -515,6 +517,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     }
 
     setIsLoading(false);
+    onUploadingChange?.(false);
 
     // Final summary toast — use local variable (not React state, which is stale in async closures)
     const totalFolders = folderMap.size;
