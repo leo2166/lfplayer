@@ -395,135 +395,143 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
     onUploadingChange?.(true);
     setUploadStatuses(files.map(f => ({ fileName: f.name, status: 'Pendiente', message: 'En espera para procesar', color: 'text-muted-foreground' })));
 
-    // ── STEP 1: Group files by folder ──────────────────────────────────────
-    const folderMap = new Map<string, File[]>();
-    for (const file of files) {
-      const relativePath = (file as any).path_override || file.webkitRelativePath || '';
-      let folderName: string;
-      if (relativePath.includes('/')) {
-        const parts = relativePath.split('/');
-        folderName = parts[parts.length - 2];
-      } else {
-        folderName = artistNameInput.trim() || 'Archivos sueltos';
-      }
-      if (!folderMap.has(folderName)) folderMap.set(folderName, []);
-      folderMap.get(folderName)!.push(file);
-    }
-
-    // Initialize folder statuses
-    const initialFolderStatuses: FolderStatus[] = Array.from(folderMap.entries()).map(([name, folderFiles]) => ({
-      name,
-      expected: folderFiles.length,
-      uploaded: 0,
-      errors: 0,
-      duplicates: 0,
-      verified: null,
-      status: 'pending'
-    }));
-    setFolderStatuses(initialFolderStatuses);
-
-    // Local tracker to avoid stale React state in async closure
-    let localCompletedCount = 0;
-
-    const allSavedSongs: any[] = [];
-    let totalProcessed = 0;
-
-    // ── STEP 2: Process folder by folder ──────────────────────────────────
-    for (const [folderName, folderFiles] of folderMap.entries()) {
-      log(`\n📁 Procesando carpeta: ${folderName} (${folderFiles.length} archivos)`);
-      updateFolderStatus(folderName, { status: 'uploading' });
-
-      let folderUploaded = 0;
-      let folderErrors = 0;
-      let folderDuplicates = 0;
-
-      // Upload each file in this folder
-      for (const file of folderFiles) {
-        const result = await uploadSingleFile(file, folderName, genre_id, allSavedSongs);
-
-        if (result === 'success') {
-          folderUploaded++;
-        } else if (result === 'duplicate') {
-          folderDuplicates++;
+    try {
+      // ── STEP 1: Group files by folder ──────────────────────────────────────
+      const folderMap = new Map<string, File[]>();
+      for (const file of files) {
+        const relativePath = (file as any).path_override || file.webkitRelativePath || '';
+        let folderName: string;
+        if (relativePath.includes('/')) {
+          const parts = relativePath.split('/');
+          folderName = parts[parts.length - 2];
         } else {
-          folderErrors++;
+          folderName = artistNameInput.trim() || 'Archivos sueltos';
+        }
+        if (!folderMap.has(folderName)) folderMap.set(folderName, []);
+        folderMap.get(folderName)!.push(file);
+      }
+
+      // Initialize folder statuses
+      const initialFolderStatuses: FolderStatus[] = Array.from(folderMap.entries()).map(([name, folderFiles]) => ({
+        name,
+        expected: folderFiles.length,
+        uploaded: 0,
+        errors: 0,
+        duplicates: 0,
+        verified: null,
+        status: 'pending'
+      }));
+      setFolderStatuses(initialFolderStatuses);
+
+      // Local tracker to avoid stale React state in async closure
+      let localCompletedCount = 0;
+
+      const allSavedSongs: any[] = [];
+      let totalProcessed = 0;
+
+      // ── STEP 2: Process folder by folder ──────────────────────────────────
+      for (const [folderName, folderFiles] of folderMap.entries()) {
+        log(`\n📁 Procesando carpeta: ${folderName} (${folderFiles.length} archivos)`);
+        updateFolderStatus(folderName, { status: 'uploading' });
+
+        let folderUploaded = 0;
+        let folderErrors = 0;
+        let folderDuplicates = 0;
+        const failedInFirstPass: File[] = [];
+
+        // Upload each file in this folder
+        for (const file of folderFiles) {
+          const result = await uploadSingleFile(file, folderName, genre_id, allSavedSongs);
+
+          if (result === 'success') {
+            folderUploaded++;
+          } else if (result === 'duplicate') {
+            folderDuplicates++;
+          } else {
+            folderErrors++;
+            failedInFirstPass.push(file);
+          }
+
+          totalProcessed++;
+          setUploadProgress((totalProcessed / files.length) * 100);
+          updateFolderStatus(folderName, { uploaded: folderUploaded, errors: folderErrors, duplicates: folderDuplicates });
         }
 
-        totalProcessed++;
-        setUploadProgress((totalProcessed / files.length) * 100);
-        updateFolderStatus(folderName, { uploaded: folderUploaded, errors: folderErrors, duplicates: folderDuplicates });
-      }
+        // ── STEP 3: Retry failed files (max 2 attempts) ──────────────────────
+        if (folderErrors > 0 && failedInFirstPass.length > 0) {
+          log(`⚠️ ${folderErrors} errores en ${folderName}. Reintentando archivos fallidos...`);
+          const retryToastId = `retry-${folderName}`;
+          toast.loading(`Reintentando archivos fallidos de "${folderName}"...`, { id: retryToastId });
 
-      // ── STEP 3: Retry failed files (max 2 attempts) ──────────────────────
-      if (folderErrors > 0) {
-        log(`⚠️ ${folderErrors} errores en ${folderName}. Reintentando archivos fallidos...`);
-        toast.loading(`Reintentando archivos fallidos de "${folderName}"...`, { id: `retry-${folderName}` });
+          try {
+            let retriedSuccess = 0;
+            for (const file of failedInFirstPass) {
+              const result = await uploadSingleFile(file, folderName, genre_id, allSavedSongs, 2);
+              if (result === 'success') {
+                retriedSuccess++;
+                folderUploaded++;
+                folderErrors--;
+              }
+            }
 
-        const failedFiles = folderFiles.filter(file => {
-          const status = uploadStatuses.find(s => s.fileName === file.name);
-          return status?.status === 'Error';
-        });
-
-        let retriedSuccess = 0;
-        for (const file of failedFiles) {
-          const result = await uploadSingleFile(file, folderName, genre_id, allSavedSongs, 2);
-          if (result === 'success') {
-            retriedSuccess++;
-            folderUploaded++;
-            folderErrors--;
+            if (retriedSuccess > 0) {
+              log(`✅ ${retriedSuccess} archivos recuperados en el reintento.`);
+              updateFolderStatus(folderName, { uploaded: folderUploaded, errors: folderErrors });
+            }
+          } finally {
+            toast.dismiss(retryToastId);
           }
         }
 
-        toast.dismiss(`retry-${folderName}`);
-        if (retriedSuccess > 0) {
-          log(`✅ ${retriedSuccess} archivos recuperados en el reintento.`);
-          updateFolderStatus(folderName, { uploaded: folderUploaded, errors: folderErrors });
+        // ── STEP 4: Verify folder integrity (origin == destination) ──────────
+        log(`🔍 Verificando integridad de "${folderName}"...`);
+        updateFolderStatus(folderName, { status: 'verifying' });
+
+        // Expected = new uploads + duplicates (duplicates are already in DB, so they count)
+        const expectedInDB = folderUploaded + folderDuplicates;
+        const { actual, ok } = await verifyFolderIntegrity(folderName, genre_id, expectedInDB);
+
+        if (actual === -1) {
+          // Verification failed (network error etc.)
+          log(`⚠️ No se pudo verificar "${folderName}" (error de red).`);
+          updateFolderStatus(folderName, { verified: null, status: 'warning' });
+          toast.warning(`No se pudo verificar la integridad de "${folderName}".`);
+        } else if (ok) {
+          log(`✅ Carpeta "${folderName}" verificada: ${actual} canciones en Supabase.`);
+          updateFolderStatus(folderName, { verified: actual, status: 'complete' });
+          localCompletedCount++;
+        } else {
+          // Mismatch detected
+          const missing = expectedInDB - actual;
+          log(`❌ Discrepancia en "${folderName}": esperados=${expectedInDB}, en DB=${actual}, faltantes=${missing}`);
+          updateFolderStatus(folderName, { verified: actual, status: 'incomplete' });
+          toast.error(
+            `⚠️ "${folderName}": se subieron ${folderUploaded} canciones pero Supabase muestra ${actual}. Diferencia: ${missing}.`,
+            { duration: 10000 }
+          );
         }
       }
 
-      // ── STEP 4: Verify folder integrity (origin == destination) ──────────
-      log(`🔍 Verificando integridad de "${folderName}"...`);
-      updateFolderStatus(folderName, { status: 'verifying' });
-
-      // Expected = new uploads + duplicates (duplicates are already in DB, so they count)
-      const expectedInDB = folderUploaded + folderDuplicates;
-      const { actual, ok } = await verifyFolderIntegrity(folderName, genre_id, expectedInDB);
-
-      if (actual === -1) {
-        // Verification failed (network error etc.)
-        log(`⚠️ No se pudo verificar "${folderName}" (error de red).`);
-        updateFolderStatus(folderName, { verified: null, status: 'warning' });
-        toast.warning(`No se pudo verificar la integridad de "${folderName}".`);
-      } else if (ok) {
-        log(`✅ Carpeta "${folderName}" verificada: ${actual} canciones en Supabase.`);
-        updateFolderStatus(folderName, { verified: actual, status: 'complete' });
-        localCompletedCount++;
-      } else {
-        // Mismatch detected
-        const missing = expectedInDB - actual;
-        log(`❌ Discrepancia en "${folderName}": esperados=${expectedInDB}, en DB=${actual}, faltantes=${missing}`);
-        updateFolderStatus(folderName, { verified: actual, status: 'incomplete' });
-        toast.error(
-          `⚠️ "${folderName}": se subieron ${folderUploaded} canciones pero Supabase muestra ${actual}. Diferencia: ${missing}.`,
-          { duration: 10000 }
-        );
+      if (allSavedSongs.length > 0) {
+        onUploadSuccess?.(allSavedSongs);
       }
-    }
 
-    if (allSavedSongs.length > 0) {
-      onUploadSuccess?.(allSavedSongs);
-    }
+      // Final summary toast — use local variable (not React state, which is stale in async closures)
+      const totalFolders = folderMap.size;
+      if (localCompletedCount === totalFolders) {
+        toast.success(`✅ ¡Subida completa! ${totalFolders} ${totalFolders === 1 ? 'carpeta verificada' : 'carpetas verificadas'} al 100%.`);
+      } else {
+        const incomplete = totalFolders - localCompletedCount;
+        toast.warning(`Subida finalizada: ${localCompletedCount}/${totalFolders} carpetas completas. ${incomplete} con advertencias — revisa el detalle.`, { duration: 8000 });
+      }
 
-    setIsLoading(false);
-    onUploadingChange?.(false);
-
-    // Final summary toast — use local variable (not React state, which is stale in async closures)
-    const totalFolders = folderMap.size;
-    if (localCompletedCount === totalFolders) {
-      toast.success(`✅ ¡Subida completa! ${totalFolders} ${totalFolders === 1 ? 'carpeta verificada' : 'carpetas verificadas'} al 100%.`);
-    } else {
-      const incomplete = totalFolders - localCompletedCount;
-      toast.warning(`Subida finalizada: ${localCompletedCount}/${totalFolders} carpetas completas. ${incomplete} con advertencias — revisa el detalle.`, { duration: 8000 });
+    } catch (err) {
+      console.error("Critical error during upload process:", err);
+      setError("Un error crítico detuvo el proceso de subida.");
+      toast.error("Error crítico durante la subida. Revisa los logs.");
+    } finally {
+      setIsLoading(false);
+      onUploadingChange?.(false);
     }
   }
 
