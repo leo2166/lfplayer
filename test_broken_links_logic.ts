@@ -46,7 +46,7 @@ async function findBrokenSupabaseRecords() {
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
         .select('id, title, artist, blob_url, storage_account_number')
-        .range(0, 9999);
+        .range(0, 50000);
 
     if (dbError) {
         throw new Error(`Error de base de datos: ${dbError.message}`);

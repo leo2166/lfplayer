@@ -55,7 +55,7 @@ async function getOrphanKeys() {
     const { data: songs, error: dbError } = await supabaseAdmin
         .from('songs')
         .select('blob_url, title, artist, storage_account_number')
-        .range(0, 9999);
+        .range(0, 50000);
 
     if (dbError) {
         throw new Error(`Error de base de datos: ${dbError.message}`);

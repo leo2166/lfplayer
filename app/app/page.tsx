@@ -12,7 +12,7 @@ export default async function AppPage() {
 
   // Fetch songs with user context (RLS applied) and genres (public access)
   const [{ data: songsData }, { data: genresData }] = await Promise.all([
-    supabase.from("songs").select("*").order('title', { ascending: true }).range(0, 10000),
+    supabase.from("songs").select("*").order('title', { ascending: true }).range(0, 50000),
     supabase.from("genres").select("*").order('display_order', { ascending: true }),
   ])
 

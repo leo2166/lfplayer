@@ -28,7 +28,8 @@ async function main() {
     console.log("Fetching ALL music data to see artists...");
     const { data: songs, error } = await supabase
         .from('songs')
-        .select('artist, title');
+        .select('artist, title')
+        .range(0, 50000);
 
     if (error) {
         console.error("Error:", error);
