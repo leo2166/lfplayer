@@ -70,7 +70,9 @@ export default function MusicLibrary() {
   const [showOrphanDeleteConfirm, setShowOrphanDeleteConfirm] = useState(false);
 
   const [isCheckingBrokenLinks, setIsCheckingBrokenLinks] = useState(false);
+  const [isDeletingBrokenLinks, setIsDeletingBrokenLinks] = useState(false);
   const [showBrokenLinkResult, setShowBrokenLinkResult] = useState(false);
+  const [showBrokenLinkDeleteConfirm, setShowBrokenLinkDeleteConfirm] = useState(false);
   const [brokenLinkResult, setBrokenLinkResult] = useState<any>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<{ id: string, name: string } | null>(null)
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
@@ -308,6 +310,29 @@ export default function MusicLibrary() {
     }
   };
 
+  const handleDeleteBrokenLinks = async () => {
+    setIsDeletingBrokenLinks(true);
+    setShowBrokenLinkDeleteConfirm(false);
+    const toastId = toast.loading('Eliminando registros rotos en Supabase...');
+    try {
+      const response = await fetch('/api/cleanup-supabase/broken-links', {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Ocurrió un error');
+      }
+      toast.success(result.message || 'Limpieza de registros rotos completada.', { id: toastId });
+      setShowBrokenLinkResult(false);
+      refetchSongs();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error al eliminar registros rotos: ${errorMessage}`, { id: toastId });
+    } finally {
+      setIsDeletingBrokenLinks(false);
+    }
+  };
+
   const handleCloseWelcomeOverlay = () => {
     setShowWelcomeOverlay(false);
     localStorage.setItem('hasSeenWelcomeOverlay', 'true');
@@ -391,23 +416,34 @@ export default function MusicLibrary() {
       <Accordion type="single" collapsible className="w-full space-y-2">
         {sortedArtistNames.map((artist) => {
           const artistSongs = groupedByArtist[artist];
+          const isArtistPlaying = artistSongs.some(s => s.id === currentSong?.id);
+
           return (
-            <AccordionItem value={artist} key={artist} className="border border-border rounded-lg bg-card/50">
+            <AccordionItem value={artist} key={artist} className={cn(
+              "border border-border rounded-lg bg-card/50 transition-colors",
+              isArtistPlaying && "border-purple-500/50 bg-purple-500/5 shadow-[0_0_15px_rgba(147,51,234,0.1)]"
+            )}>
               <AccordionPrimitive.Header className="group flex items-center justify-between w-full px-4">
                 <AccordionPrimitive.Trigger
                   className={cn("flex flex-1 items-center justify-between py-3 text-left text-sm font-medium transition-all hover:no-underline")}
                 >
                   <div className="flex items-center gap-3">
-                    <Folder className="w-6 h-6 text-purple-600" />
+                    <Folder className={cn(
+                      "w-6 h-6 transition-colors",
+                      isArtistPlaying ? "text-pink-500 animate-pulse" : "text-purple-600"
+                    )} />
                     <div className="text-left">
-                      <h3 className="font-semibold text-lg">{artist}</h3>
+                      <h3 className={cn(
+                        "font-semibold text-lg transition-colors",
+                        isArtistPlaying && "text-purple-600 dark:text-purple-400"
+                      )}>{artist}</h3>
                       <p className="text-sm text-muted-foreground">{artistSongs.length} {artistSongs.length === 1 ? 'canción' : 'canciones'}</p>
                     </div>
                   </div>
                   <ChevronDownIcon className="h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground group-data-[state=open]:rotate-180" />
                 </AccordionPrimitive.Trigger>
                 {userRole === 'admin' && (
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -642,8 +678,47 @@ export default function MusicLibrary() {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-between">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)} className="bg-transparent text-primary hover:bg-secondary border border-transparent hover:border-border">Cerrar</AlertDialogAction>
+            </div>
+
+            {brokenLinkResult?.brokenRecordCount > 0 && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowBrokenLinkResult(false);
+                    setShowBrokenLinkDeleteConfirm(true);
+                  }}
+                  disabled={isDeletingBrokenLinks}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar todo
+                </Button>
+              </div>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Broken Link Delete Confirmation Dialog */}
+      <AlertDialog open={showBrokenLinkDeleteConfirm} onOpenChange={setShowBrokenLinkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar registros rotos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará de la base de datos de Supabase los **{brokenLinkResult?.brokenRecordCount}** registros encontrados que no tienen archivo físico en Cloudflare R2. Esta acción es irreversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowBrokenLinkResult(false)}>Cerrar</AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBrokenLinks}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Sí, eliminar todo
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

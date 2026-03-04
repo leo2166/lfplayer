@@ -9,11 +9,21 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // Allow public access (RLS policies will handle security defined in scripts/009_add_public_songs_policy.sql)
-    // const { data: { user } } = await supabase.auth.getUser()
-    // if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
     const genre_id = request.nextUrl.searchParams.get("genre_id")
+    const artist = request.nextUrl.searchParams.get("artist")
+    const count_only = request.nextUrl.searchParams.get("count_only") === "true"
+
+    // count_only mode: just return the count for a specific artist+genre (used for upload integrity check)
+    if (count_only && artist && genre_id) {
+      const { count, error } = await supabase
+        .from("songs")
+        .select("id", { count: "exact", head: true })
+        .eq("artist", artist)
+        .eq("genre_id", genre_id)
+
+      if (error) throw error
+      return NextResponse.json({ count: count ?? 0 })
+    }
 
     let query = supabase
       .from("songs")
@@ -26,7 +36,6 @@ export async function GET(request: NextRequest) {
         genre_id,
         genres (id, name, color)
       `)
-      // .eq("user_id", user.id) // Removed to allow guest access
       .order("created_at", { ascending: false })
 
     if (genre_id && genre_id !== "all") {
@@ -47,6 +56,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch songs" }, { status: 500 })
   }
 }
+
 
 export async function POST(request: NextRequest) {
   try {

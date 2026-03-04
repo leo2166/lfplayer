@@ -45,6 +45,7 @@ export const viewport = {
 };
 
 import { Providers } from "./providers"
+import { Toaster } from "sonner"
 import { redirect } from "next/navigation"
 
 export default function RootLayout({
@@ -63,6 +64,7 @@ export default function RootLayout({
             {children}
             <GlobalMusicPlayer />
             <Analytics />
+            <Toaster position="top-center" richColors />
           </MusicPlayerProvider>
         </Providers>
       </body>

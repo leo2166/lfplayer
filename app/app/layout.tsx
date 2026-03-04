@@ -17,7 +17,7 @@ export default async function RootLayout({
 
   if (user) {
     // FORCE ADMIN FOR LUCIDIO (Robust fallback if DB profile is missing role)
-    if (user.email?.includes('lucidio')) {
+    if (user.email && user.email.toLowerCase().includes('lucidio')) {
       userRole = 'admin';
       console.log("🔒 Admin privileges granted via email override.");
     } else {

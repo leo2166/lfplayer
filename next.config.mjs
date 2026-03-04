@@ -21,8 +21,28 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Explicitly set the workspace root to prevent Next.js from inferring it incorrectly
-  // This helps with file watching and module resolution in monorepos or complex setups.
+  // Excluir carpetas no-código del file watcher para reducir uso de RAM
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/scripts/**',
+          '**/audio_normalizer/**',
+          '**/Salsa Para Bailar V1/**',
+          '**/*.mp3',
+          '**/*.wav',
+          '**/*.flac',
+          '**/*.ogg',
+        ],
+        poll: false,
+        aggregateTimeout: 500,
+      };
+    }
+    return config;
+  },
   turbopack: {
     root: __dirname,
   },

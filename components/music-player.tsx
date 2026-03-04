@@ -60,6 +60,20 @@ export default function MusicPlayer({
     }
   }, [volume])
 
+  // Effect to handle auto-play when song changes
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (isPlaying) {
+      // We don't call audio.play() here directly because the src might still be loading.
+      // Instead, we wait for the onCanPlay event to fire.
+      // However, we need to ensure the audio element knows it should be playing.
+    } else {
+      audio.pause()
+    }
+  }, [isPlaying, currentSong?.id])
+
   // Effect to seek audio when currentTime changes from outside (e.g., on song change)
   useEffect(() => {
     const audio = audioRef.current
@@ -141,6 +155,16 @@ export default function MusicPlayer({
           onLoadedMetadata={() => {
             if (audioRef.current) audioRef.current.currentTime = currentTime
           }}
+          onCanPlay={(e) => {
+            if (isPlaying) {
+              const playPromise = e.currentTarget.play()
+              if (playPromise !== undefined) {
+                playPromise.catch((err) => {
+                  if (err.name !== 'AbortError') console.error("Playback error:", err)
+                })
+              }
+            }
+          }}
           onEnded={onNext}
           crossOrigin="anonymous"
         />
@@ -199,6 +223,16 @@ export default function MusicPlayer({
         onTimeUpdate={handleTimeUpdateEvent}
         onLoadedMetadata={() => {
           if (audioRef.current) audioRef.current.currentTime = currentTime
+        }}
+        onCanPlay={(e) => {
+          if (isPlaying) {
+            const playPromise = e.currentTarget.play()
+            if (playPromise !== undefined) {
+              playPromise.catch((err) => {
+                if (err.name !== 'AbortError') console.error("Playback error:", err)
+              })
+            }
+          }
         }}
         onEnded={onNext}
         crossOrigin="anonymous"

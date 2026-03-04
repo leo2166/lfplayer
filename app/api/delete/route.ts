@@ -15,14 +15,20 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Admin override for primary admin user (ensures access regardless of profile sync)
+    // Pattern consistent with other endpoints (cleanup-supabase, genres, storage-status)
+    const isOverrideAdmin = user.email ? user.email.toLowerCase().includes('lucidio') : false;
 
-    if (profileError || !profile || profile.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
+    if (!isOverrideAdmin) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || !profile || profile.role !== "admin") {
+        return NextResponse.json({ error: "Forbidden: User is not an admin" }, { status: 403 });
+      }
     }
 
     // User is an admin, proceed with deletion logic
@@ -33,10 +39,16 @@ export async function DELETE(req: NextRequest) {
     }
 
     // 2. Get all songs by the artist from Supabase using the admin client
-    const { data: foundSongs, error: dbError } = await supabaseAdmin
-      .from('songs')
-      .select('id, blob_url, storage_account_number')
-      .eq('artist', artist);
+    // We try to match exactly first, otherwise we handle "Artista Desconocido" (null artist)
+    let query = supabaseAdmin.from('songs').select('id, blob_url, storage_account_number');
+
+    if (artist === "Artista Desconocido") {
+      query = query.is('artist', null);
+    } else {
+      query = query.eq('artist', artist);
+    }
+
+    const { data: foundSongs, error: dbError } = await query;
 
     if (dbError) {
       console.error('Error fetching songs from Supabase:', dbError);

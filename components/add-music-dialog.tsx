@@ -53,7 +53,7 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Agregar Nueva Música</DialogTitle>
           <DialogDescription>
