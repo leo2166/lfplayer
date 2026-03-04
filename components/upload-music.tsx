@@ -485,10 +485,8 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       log(`🔍 Verificando integridad de "${folderName}"...`);
       updateFolderStatus(folderName, { status: 'verifying' });
 
-      // Expected = files uploaded successfully + duplicates that were already in DB
-      // Duplicates are NOT new, but they are still "accounted for" 
-      // We only count truly new uploads for the expected in Supabase
-      const expectedInDB = folderUploaded; // only the new ones we uploaded
+      // Expected = new uploads + duplicates (duplicates are already in DB, so they count)
+      const expectedInDB = folderUploaded + folderDuplicates;
       const { actual, ok } = await verifyFolderIntegrity(folderName, genre_id, expectedInDB);
 
       if (actual === -1) {
