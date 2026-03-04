@@ -89,7 +89,7 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, pr
             }
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4">
+        <div className="mt-4 flex-1 flex flex-col overflow-hidden">
           <UploadMusic
             genres={genres}
             onUploadSuccess={handleSuccess}

@@ -538,7 +538,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 flex flex-col gap-4">
+    <div className="rounded-lg border border-border bg-card p-6 flex flex-col gap-4 flex-1 overflow-hidden">
       <h3 className="text-lg font-semibold flex items-center gap-2 flex-shrink-0">
         <Upload className="w-5 h-5 text-purple-600" />
         Subir Música
@@ -572,7 +572,7 @@ export default function UploadMusic({ genres, onUploadSuccess, preselectedArtist
       </div>
 
       {/* Scrollable form area */}
-      <div className="overflow-y-auto flex-1" style={{ maxHeight: '55vh' }}>
+      <div className="overflow-y-auto flex-1 pr-2">
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
 
           {/* Artist Input - Only show if not auto-detected from folders */}
