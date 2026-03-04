@@ -51,16 +51,36 @@ async function getOrphanKeys() {
 
     console.log(`[ORPHAN CHECK] Scanned accounts: ${[...scannedAccounts].join(', ')}. Total files: ${r2FileKeys.size}`);
 
-    // 2. Get all songs
-    const { data: songs, error: dbError } = await supabaseAdmin
-        .from('songs')
-        .select('blob_url, title, artist, storage_account_number')
-        .range(0, 50000);
+    // 2. Get all songs using batching to bypass Supabase 1000-row limit
+    async function batchFetchAllSongs() {
+        let allSongs: any[] = [];
+        let from = 0;
+        let to = 999;
+        let finished = false;
 
-    if (dbError) {
-        throw new Error(`Error de base de datos: ${dbError.message}`);
+        while (!finished) {
+            const { data, error } = await supabaseAdmin
+                .from('songs')
+                .select('blob_url, title, artist, storage_account_number')
+                .range(from, to);
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                finished = true;
+            } else {
+                allSongs = [...allSongs, ...data];
+                if (data.length < 1000) {
+                    finished = true;
+                } else {
+                    from += 1000;
+                    to += 1000;
+                }
+            }
+        }
+        return allSongs;
     }
 
+    const songs = await batchFetchAllSongs();
     console.log(`[ORPHAN CHECK] Total songs in DB: ${songs.length}`);
 
     // 3. Build set of referenced keys (only for scanned accounts)

@@ -25,32 +25,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ count: count ?? 0 })
     }
 
-    let query = supabase
-      .from("songs")
-      .select(`
-        id,
-        title,
-        artist,
-        duration,
-        blob_url,
-        genre_id,
-        genres (id, name, color)
-      `)
-      .order("created_at", { ascending: false })
+    let allSongs: any[] = [];
+    let from = 0;
+    let to = 999;
+    let finished = false;
 
-    if (genre_id && genre_id !== "all") {
-      query = query.eq("genre_id", genre_id)
+    while (!finished) {
+      let query = supabase
+        .from("songs")
+        .select(`
+          id,
+          title,
+          artist,
+          duration,
+          blob_url,
+          genre_id,
+          genres (id, name, color)
+        `)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (genre_id && genre_id !== "all") {
+        query = query.eq("genre_id", genre_id)
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        finished = true;
+      } else {
+        allSongs = [...allSongs, ...data];
+        if (data.length < 1000) {
+          finished = true;
+        } else {
+          from += 1000;
+          to += 1000;
+        }
+      }
     }
 
-    // FIX: Supabase defaults to 1000 rows. We increase this range to prevent older songs from "disappearing".
-    // 50,000 should be sufficient for the current scale.
-    query = query.range(0, 50000);
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    return NextResponse.json({ songs: data })
+    return NextResponse.json({ songs: allSongs })
   } catch (error) {
     console.error("Error fetching songs:", error)
     return NextResponse.json({ error: "Failed to fetch songs" }, { status: 500 })

@@ -52,16 +52,36 @@ async function findBrokenSupabaseRecords() {
     const totalR2Files = Array.from(r2FileKeys.values()).reduce((sum, set) => sum + set.size, 0);
     console.log(`[BROKEN LINKS] Scanned accounts: ${[...scannedAccounts].join(', ')}. Total files: ${totalR2Files}`);
 
-    // 2. Get all songs
-    const { data: songs, error: dbError } = await supabaseAdmin
-        .from('songs')
-        .select('id, title, artist, blob_url, storage_account_number')
-        .range(0, 50000);
+    // 2. Get all songs using batching to bypass Supabase 1000-row limit
+    async function batchFetchAllSongs() {
+        let allSongs: any[] = [];
+        let from = 0;
+        let to = 999;
+        let finished = false;
 
-    if (dbError) {
-        throw new Error(`Error de base de datos: ${dbError.message}`);
+        while (!finished) {
+            const { data, error } = await supabaseAdmin
+                .from('songs')
+                .select('id, title, artist, blob_url, storage_account_number')
+                .range(from, to);
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                finished = true;
+            } else {
+                allSongs = [...allSongs, ...data];
+                if (data.length < 1000) {
+                    finished = true;
+                } else {
+                    from += 1000;
+                    to += 1000;
+                }
+            }
+        }
+        return allSongs;
     }
 
+    const songs = await batchFetchAllSongs();
     console.log(`[BROKEN LINKS] Total songs in DB: ${songs.length}`);
 
     const r2PublicUrl1 = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL || '';

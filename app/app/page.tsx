@@ -10,17 +10,41 @@ export const dynamic = 'force-dynamic';
 export default async function AppPage() {
   const supabase = await createClient()
 
-  // Fetch songs with user context (RLS applied) and genres (public access)
-  const [{ data: songsData }, { data: genresData }] = await Promise.all([
-    supabase.from("songs").select("*").order('title', { ascending: true }).range(0, 50000),
-    supabase.from("genres").select("*").order('display_order', { ascending: true }),
-  ])
+  // Fetch genres (usually few enough for a single call)
+  const { data: genresData } = await supabase.from("genres").select("*").order('display_order', { ascending: true });
+  const genres: Genre[] = genresData ?? [];
 
-  const songs: Song[] = songsData ?? []
-  const genres: Genre[] = genresData ?? []
+  // Fetch ALL songs using batching to bypass Supabase 1000-row limit
+  let allSongs: Song[] = [];
+  let from = 0;
+  let to = 999;
+  let finished = false;
+
+  while (!finished) {
+    const { data: batchSongs, error } = await supabase
+      .from("songs")
+      .select("*")
+      .order('title', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      console.error("Error batch fetching songs:", error);
+      finished = true;
+    } else if (!batchSongs || batchSongs.length === 0) {
+      finished = true;
+    } else {
+      allSongs = [...allSongs, ...batchSongs];
+      if (batchSongs.length < 1000) {
+        finished = true;
+      } else {
+        from += 1000;
+        to += 1000;
+      }
+    }
+  }
 
   return (
-    <MusicLibraryProvider initialSongs={songs} initialGenres={genres}>
+    <MusicLibraryProvider initialSongs={allSongs} initialGenres={genres}>
       <MusicLibrary />
     </MusicLibraryProvider>
   )
