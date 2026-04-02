@@ -168,10 +168,12 @@ export async function updateBucketUsage(
  * Determina de qué cuenta leer un archivo basándose en su URL
  */
 export function getAccountNumberFromUrl(blobUrl: string): 1 | 2 {
-    if (blobUrl.includes(R2_ACCOUNTS[1].publicUrl)) {
-        return 1
-    } else if (blobUrl.includes(R2_ACCOUNTS[2].publicUrl)) {
+    // Chequear Account 2 primero: su URL (/b2) es más específica y está
+    // contenida dentro de la URL base de Account 1 (mismo dominio Worker)
+    if (blobUrl.includes(R2_ACCOUNTS[2].publicUrl)) {
         return 2
+    } else if (blobUrl.includes(R2_ACCOUNTS[1].publicUrl)) {
+        return 1
     }
     // Default a cuenta 1 si no se puede determinar
     return 1
