@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { r2 } from '@/lib/cloudflare/r2';
+import { getR2ClientForAccount, getBucketConfig, updateBucketUsage } from '@/lib/cloudflare/r2-manager';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     const { data: foundSongs, error: dbError } = await supabaseAdmin
       .from('songs')
-      .select('id, blob_url')
+      .select('id, blob_url, storage_account_number')
       .gte('created_at', startDate)
       .lte('created_at', endDate);
 
@@ -63,23 +63,30 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Delete files from storage (Cloudflare R2 or Supabase Storage)
-    const r2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const deletePromises = [];
 
     for (const song of foundSongs) {
       if (!song.blob_url) continue;
 
-      if (r2PublicUrl && song.blob_url.startsWith(r2PublicUrl)) {
-        let key = song.blob_url.substring(r2PublicUrl.length);
+      const accountNumber = (song.storage_account_number || 1) as 1 | 2;
+      const r2Client = getR2ClientForAccount(accountNumber);
+      const bucketConfig = getBucketConfig(accountNumber);
+
+      if (song.blob_url.startsWith(bucketConfig.publicUrl)) {
+        let key = song.blob_url.substring(bucketConfig.publicUrl.length);
         const finalKey = key.startsWith('/') ? key.substring(1) : key;
 
         if (finalKey) {
           const deleteParams = {
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+            Bucket: bucketConfig.bucketName,
             Key: finalKey,
           };
-          deletePromises.push(r2.send(new DeleteObjectCommand(deleteParams)));
+          deletePromises.push(
+            r2Client.send(new DeleteObjectCommand(deleteParams))
+              .then(() => ({ success: true, accountNumber }))
+              .catch(err => ({ success: false, error: err }))
+          );
         } else {
           console.warn(`Could not extract a valid R2 key from URL: ${song.blob_url}`);
         }
@@ -92,7 +99,10 @@ export async function POST(req: NextRequest) {
           const filePath = filePathParts.join('/');
           
           if(bucketName && filePath) {
-            deletePromises.push(supabaseAdmin.storage.from(bucketName).remove([filePath]));
+            deletePromises.push(
+              supabaseAdmin.storage.from(bucketName).remove([filePath])
+                .then(() => ({ success: true, isSupabase: true }))
+            );
           }
         }
       }
@@ -100,13 +110,28 @@ export async function POST(req: NextRequest) {
 
     const results = await Promise.allSettled(deletePromises);
     let successfulR2Deletions = 0;
+    const usageUpdates: Record<number, number> = {};
+
     results.forEach(result => {
         if (result.status === 'fulfilled') {
-            successfulR2Deletions++;
+            const value = result.value as any;
+            if (value.success) {
+                if (value.accountNumber) {
+                    successfulR2Deletions++;
+                    const accountNumber = value.accountNumber as number;
+                    usageUpdates[accountNumber] = (usageUpdates[accountNumber] || 0) - 4194304; // -4MB estimado
+                    console.log(`Successfully deleted a file from R2 account ${accountNumber}`);
+                }
+            }
         } else {
             console.error('Failed to delete a file from storage:', result.reason);
         }
     });
+
+    // Actualizar uso de almacenamiento para cada cuenta
+    for (const [accountNumber, bytesChange] of Object.entries(usageUpdates)) {
+      await updateBucketUsage(Number(accountNumber) as 1 | 2, bytesChange);
+    }
 
     // 4. Delete song records from Supabase
     const songIds = foundSongs.map(song => song.id);

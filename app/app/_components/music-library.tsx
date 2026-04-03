@@ -407,13 +407,16 @@ export default function MusicLibrary() {
         </div>
       )}
 
-      <GenreFilter
-        genres={genres}
-        selectedGenre={selectedGenre}
-        onSelectGenre={setSelectedGenre}
-      />
+      {songs.length > 0 && (
+        <GenreFilter
+          genres={genres}
+          selectedGenre={selectedGenre}
+          onSelectGenre={setSelectedGenre}
+        />
+      )}
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
+      {songs.length > 0 && (
+        <Accordion type="single" collapsible className="w-full space-y-2">
         {sortedArtistNames.map((artist) => {
           const artistSongs = groupedByArtist[artist];
           const isArtistPlaying = artistSongs.some(s => s.id === currentSong?.id);
@@ -493,11 +496,29 @@ export default function MusicLibrary() {
           );
         })}
       </Accordion>
+      )}
 
       {filteredSongs.length === 0 && (
-        <div className="text-center py-16">
-          <p className="text-muted-foreground">No se encontraron canciones para este género.</p>
-          <p className="text-sm text-muted-foreground/80">Intenta seleccionar otro género o agrega nueva música.</p>
+        <div className="text-center py-16 flex flex-col items-center justify-center space-y-4">
+          <div className="bg-muted/50 p-6 rounded-full">
+            <Music className="w-12 h-12 text-muted-foreground/50" />
+          </div>
+          {songs.length === 0 ? (
+            <>
+              <h3 className="text-xl font-semibold">La biblioteca está vacía</h3>
+              <p className="text-muted-foreground max-w-md">
+                {userRole === 'admin' 
+                  ? "Aún no hay música en tu biblioteca. Empieza a añadir canciones o carpetas de artistas para llenarla."
+                  : "No hay música disponible en este momento. El administrador aún no ha añadido canciones. ¡Vuelve más tarde!"}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-semibold">No hay resultados</h3>
+              <p className="text-muted-foreground">No se encontraron canciones para este género.</p>
+              <p className="text-sm text-muted-foreground/80">Intenta seleccionar otro género.</p>
+            </>
+          )}
         </div>
       )}
 
