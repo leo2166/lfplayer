@@ -32,7 +32,11 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
 
     const handleSignOut = async () => {
         closePlayer()
-        await supabase.auth.signOut()
+        try {
+            await supabase.auth.signOut()
+        } catch (error) {
+            console.error("Error signing out, forcing redirect:", error)
+        }
         router.push("/")
     }
 
