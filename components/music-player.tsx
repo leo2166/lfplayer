@@ -166,7 +166,6 @@ export default function MusicPlayer({
             }
           }}
           onEnded={onNext}
-          crossOrigin="anonymous"
         />
       </div>
     )
@@ -235,7 +234,6 @@ export default function MusicPlayer({
           }
         }}
         onEnded={onNext}
-        crossOrigin="anonymous"
       />
     </div>
   )
