@@ -30,7 +30,7 @@ import SongCard from "@/components/song-card"
 import { PlaylistWizard } from "@/components/playlist-wizard"
 import AddMusicDialog from "@/components/add-music-dialog"
 import WelcomeOverlay from "@/components/welcome-overlay"
-import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc } from "lucide-react"
+import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DeleteSummary {
@@ -349,13 +349,29 @@ export default function MusicLibrary() {
             </p>
           </div>
           {userRole === 'admin' && (
-            <Button
-              onClick={() => setIsPlaylistWizardOpen(true)}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2 shadow-lg hover:shadow-xl transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              Nueva Playlist
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={() => {
+                  if (selectedGenre && selectedGenre !== 'all') {
+                    window.location.href = `/api/download?genre_id=${selectedGenre}`;
+                  } else {
+                    toast.error("Por favor, selecciona un género específico para descargar.");
+                  }
+                }}
+                variant="outline"
+                className="gap-2 shadow-sm hover:shadow-md transition-all"
+              >
+                <Download className="w-4 h-4" />
+                Descargar Género
+              </Button>
+              <Button
+                onClick={() => setIsPlaylistWizardOpen(true)}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2 shadow-lg hover:shadow-xl transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                Nueva Playlist
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -452,11 +468,26 @@ export default function MusicLibrary() {
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (artistSongs[0]?.genre_id) {
+                          window.location.href = `/api/download?genre_id=${artistSongs[0].genre_id}&artist=${encodeURIComponent(artist)}`;
+                        }
+                      }}
+                      className="h-8 w-8 text-primary hover:bg-primary/10"
+                      title="Descargar Carpeta"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setArtistToAddSongTo(artist);
                         setGenreToAddSongTo(artistSongs[0]?.genre_id);
                         setAddIndividualMusicOpen(true);
                       }}
                       className="h-8 w-8 text-primary hover:bg-primary/10"
+                      title="Añadir Canción"
                     >
                       <Plus className="w-4 h-4" />
                     </Button>

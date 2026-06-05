@@ -76,7 +76,7 @@ export default function AddMusicDialog({ open, onOpenChange, onUploadSuccess, pr
           }
         }}
         // Hide the X close button during upload
-        {...(isUploading ? { hideCloseButton: true } : {})}
+        showCloseButton={!isUploading}
       >
         <DialogHeader>
           <DialogTitle>

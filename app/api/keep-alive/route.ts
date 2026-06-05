@@ -86,21 +86,39 @@ export async function GET(req: NextRequest) {
 
     // ── 2. Ping al CDN Cloudflare R2 ─────────────────────────────────────────
     const workerUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
-    if (workerUrl) {
+    const workerUrl2 = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL_2;
+
+    results.cloudflare = { urlsChecked: 0, statuses: [] as unknown[] };
+
+    const pingCloudflare = async (url: string, label: string) => {
         try {
-            const res = await fetch(workerUrl, {
+            const res = await fetch(url, {
                 method: 'HEAD',
                 signal: AbortSignal.timeout(10_000),
             });
-            console.log(`[keep-alive] ✅ Cloudflare R2 OK (HTTP ${res.status})`);
-            results.cloudflare = { status: 'ok', httpStatus: res.status };
+            console.log(`[keep-alive] ✅ Cloudflare R2 (${label}) OK (HTTP ${res.status})`);
+            return { status: 'ok', url: label, httpStatus: res.status };
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Unknown error';
-            console.error('[keep-alive] ⚠️ Cloudflare R2 ping falló:', msg);
-            results.cloudflare = { status: 'error', message: msg };
+            console.error(`[keep-alive] ⚠️ Cloudflare R2 (${label}) ping falló:`, msg);
+            return { status: 'error', url: label, message: msg };
         }
-    } else {
-        results.cloudflare = { status: 'skipped', reason: 'URL no configurada' };
+    };
+
+    if (workerUrl) {
+        const res = await pingCloudflare(workerUrl, 'Principal');
+        (results.cloudflare as any).statuses.push(res);
+        (results.cloudflare as any).urlsChecked++;
+    }
+    
+    if (workerUrl2) {
+        const res = await pingCloudflare(workerUrl2, 'Secundario');
+        (results.cloudflare as any).statuses.push(res);
+        (results.cloudflare as any).urlsChecked++;
+    }
+
+    if ((results.cloudflare as any).urlsChecked === 0) {
+        results.cloudflare = { status: 'skipped', reason: 'URLs no configuradas' };
     }
 
     // ── 3. Estado final ───────────────────────────────────────────────────────

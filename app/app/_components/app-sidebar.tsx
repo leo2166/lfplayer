@@ -2,13 +2,15 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp, Sun, Moon } from "lucide-react"
+import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp, Sun, Moon, Printer } from "lucide-react"
 import { useTheme } from "next-themes"
 import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useUserRole } from "@/contexts/UserRoleContext"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
+import { useState, useEffect } from "react"
+import PrintReportDialog from "@/components/print-report-dialog"
 
 interface AppSidebarProps {
     isOpen: boolean
@@ -22,6 +24,12 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     const { closePlayer } = useMusicPlayer()
     const router = useRouter()
     const { theme, setTheme } = useTheme()
+    const [isPrintReportOpen, setIsPrintReportOpen] = useState(false)
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     const isActive = (path: string) => pathname === path
 
@@ -54,6 +62,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     ]
 
     return (
+        <>
         <aside
             className={cn(
                 "fixed md:static inset-y-0 left-0 z-40 w-64 border-r border-border bg-card transition-transform duration-300 md:translate-x-0",
@@ -100,11 +109,9 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                         )
                     })}
 
-                    {/* Add Music Button */}
+                    {/* Add Music Button + Print Report (admin only) */}
                     {userRole === 'admin' && (
                         <>
-
-
                             <button
                                 onClick={() => {
                                     onOpenAddMusic()
@@ -117,6 +124,20 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                             >
                                 <PlusCircle className="w-5 h-5 flex-shrink-0" />
                                 <span className="font-medium">Agregar Música</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setIsPrintReportOpen(true)
+                                    onClose()
+                                }}
+                                className={cn(
+                                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+                                    "text-muted-foreground hover:text-foreground hover:bg-accent",
+                                )}
+                            >
+                                <Printer className="w-5 h-5 flex-shrink-0 text-indigo-500" />
+                                <span className="font-medium">Imprimir Contenido</span>
                             </button>
                         </>
                     )}
@@ -135,7 +156,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                                 <Moon className="w-5 h-5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
                             </div>
                             <span className="font-medium">
-                                {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
+                                {mounted ? (theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro') : 'Cambiar Modo'}
                             </span>
                         </button>
                     </div>
@@ -164,5 +185,12 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                 </div>
             </div>
         </aside>
+
+        {/* Print Report Modal — fuera del aside para evitar z-index issues */}
+        <PrintReportDialog
+            open={isPrintReportOpen}
+            onOpenChange={setIsPrintReportOpen}
+        />
+        </>
     )
 }
