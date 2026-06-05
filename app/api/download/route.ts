@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { type NextRequest, NextResponse } from "next/server";
-import archiver from "archiver";
+const archiver = require("archiver");
 
 // Fuerza que la ruta sea evaluada dinámicamente
 export const dynamic = "force-dynamic";
