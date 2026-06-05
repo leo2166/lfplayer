@@ -69,32 +69,32 @@ export async function GET(request: NextRequest) {
         : genreNameObj.name
       : "Genero";
 
-    const cleanName = (name: string) => name.replace(/[<>:"/\\|?*]+/g, '_');
+    const cleanName = (name: any) => {
+      if (!name) return "Descarga";
+      return String(name).replace(/[<>:"/\\|?*]+/g, '_');
+    };
 
     const zipFilename = artist
       ? `${cleanName(artist)}.zip`
       : `${cleanName(genreName)}.zip`;
 
-    // Create a TransformStream to bridge Node.js events to Web Streams
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-
     const archive = archiver("zip", {
       zlib: { level: 5 }, // Nivel de compresión balanceado
     });
 
-    // Handle archive events
-    archive.on("data", (chunk) => {
-      writer.write(chunk);
-    });
-
-    archive.on("end", () => {
-      writer.close();
-    });
-
-    archive.on("error", (err) => {
-      console.error("Archive error:", err);
-      writer.abort(err);
+    const stream = new ReadableStream({
+      start(controller) {
+        archive.on("data", (chunk: any) => {
+          controller.enqueue(chunk);
+        });
+        archive.on("end", () => {
+          controller.close();
+        });
+        archive.on("error", (err: any) => {
+          console.error("Archive error:", err);
+          controller.error(err);
+        });
+      }
     });
 
     // Función asíncrona para añadir archivos al ZIP secuencialmente para controlar la memoria
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     // Iniciar el proceso de descarga y compresión
     appendFiles();
 
-    return new Response(readable, {
+    return new Response(stream, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${zipFilename}"`,
