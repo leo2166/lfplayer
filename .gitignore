@@ -20,3 +20,6 @@ package-lock.json
 la-mejor-m*.mp3 
 la-mejor-musica-clasica* 
 *.mp3
+
+# Credenciales y accesos personales (NO subir a Git)
+/access/

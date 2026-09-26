@@ -62,6 +62,8 @@ export default function MusicLibrary() {
   const [isDeletingByDate, setIsDeletingByDate] = useState(false);
   const [showDateDeleteConfirm, setShowDateDeleteConfirm] = useState(false);
 
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
   const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
   const [showOrphanResult, setShowOrphanResult] = useState(false);
   const [orphanResult, setOrphanResult] = useState<any>(null);
@@ -88,6 +90,37 @@ export default function MusicLibrary() {
 
   const router = useRouter()
   const { playSong, currentSong, isPlaying } = useMusicPlayer()
+
+  // Helper: dispara descarga sin redirigir la página
+  const triggerDownload = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownloadAll = async () => {
+    setIsDownloadingAll(true);
+    toast.info('Preparando descarga completa... esto puede tardar varios minutos.', { duration: 8000 });
+    try {
+      const res = await fetch('/api/download-all');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al descargar');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, 'LFPlayer_BibliotecaCompleta.zip');
+      URL.revokeObjectURL(url);
+      toast.success('¡Descarga completa lista!');
+    } catch (e: any) {
+      toast.error(`Error: ${e.message}`);
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
 
   const genreMap = useMemo(() => {
     if (!Array.isArray(genres)) return new Map();
@@ -353,7 +386,7 @@ export default function MusicLibrary() {
               <Button
                 onClick={() => {
                   if (selectedGenre && selectedGenre !== 'all') {
-                    window.location.href = `/api/download?genre_id=${selectedGenre}`;
+                    triggerDownload(`/api/download?genre_id=${selectedGenre}`, `LFPlayer_Genero.zip`);
                   } else {
                     toast.error("Por favor, selecciona un género específico para descargar.");
                   }
@@ -363,6 +396,17 @@ export default function MusicLibrary() {
               >
                 <Download className="w-4 h-4" />
                 Descargar Género
+              </Button>
+              <Button
+                onClick={handleDownloadAll}
+                disabled={isDownloadingAll}
+                variant="outline"
+                className="gap-2 shadow-sm hover:shadow-md transition-all border-green-500/50 text-green-600 hover:bg-green-500/10 dark:text-green-400"
+              >
+                {isDownloadingAll
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Descargando...</>
+                  : <><Download className="w-4 h-4" /> Descargar Todo</>
+                }
               </Button>
               <Button
                 onClick={() => setIsPlaylistWizardOpen(true)}
@@ -469,11 +513,14 @@ export default function MusicLibrary() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (artistSongs[0]?.genre_id) {
-                          window.location.href = `/api/download?genre_id=${artistSongs[0].genre_id}&artist=${encodeURIComponent(artist)}`;
+                          triggerDownload(
+                            `/api/download?genre_id=${artistSongs[0].genre_id}&artist=${encodeURIComponent(artist)}`,
+                            `${artist}.zip`
+                          );
                         }
                       }}
                       className="h-8 w-8 text-primary hover:bg-primary/10"
-                      title="Descargar Carpeta"
+                      title="Descargar Artista"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
