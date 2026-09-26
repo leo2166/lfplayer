@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Download, X, Music2, CheckCircle2, AlertCircle } from "lucide-react"
+import { Download, X, Music2, CheckCircle2, AlertCircle, FolderCheck, HardDrive } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DownloadProgressModalProps {
@@ -9,9 +9,11 @@ interface DownloadProgressModalProps {
   total: number
   downloaded: number
   current: string
-  status: "downloading" | "zipping" | "done" | "error"
+  folderName?: string
+  status: "selecting" | "downloading" | "done" | "error"
   errorMsg?: string
   onClose: () => void
+  onCancel?: () => void
 }
 
 export function DownloadProgressModal({
@@ -19,9 +21,11 @@ export function DownloadProgressModal({
   total,
   downloaded,
   current,
+  folderName,
   status,
   errorMsg,
   onClose,
+  onCancel,
 }: DownloadProgressModalProps) {
   const [visible, setVisible] = useState(false)
 
@@ -38,15 +42,15 @@ export function DownloadProgressModal({
   const percent = total > 0 ? Math.round((downloaded / total) * 100) : 0
 
   const statusLabel = {
-    downloading: `Descargando canción ${downloaded} de ${total}...`,
-    zipping: "Empaquetando ZIP...",
-    done: "¡Descarga completa!",
+    selecting: "Elige la carpeta o pendrive en el explorador...",
+    downloading: `Guardando canción ${downloaded} de ${total}...`,
+    done: "¡Biblioteca descargada exitosamente!",
     error: "Error en la descarga",
   }[status]
 
   const statusIcon = {
+    selecting: <HardDrive className="w-6 h-6 text-amber-400 animate-pulse" />,
     downloading: <Download className="w-6 h-6 text-blue-400 animate-bounce" />,
-    zipping: <Music2 className="w-6 h-6 text-purple-400 animate-pulse" />,
     done: <CheckCircle2 className="w-6 h-6 text-green-400" />,
     error: <AlertCircle className="w-6 h-6 text-red-400" />,
   }[status]
@@ -62,7 +66,8 @@ export function DownloadProgressModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       {/* Modal Glass */}
-      <div className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+      <div
+        className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
           backdropFilter: "blur(24px)",
@@ -78,7 +83,7 @@ export function DownloadProgressModal({
             <div className="flex items-center gap-3">
               {statusIcon}
               <div>
-                <h2 className="font-bold text-white text-lg leading-tight">Descargando Biblioteca</h2>
+                <h2 className="font-bold text-white text-lg leading-tight">Descarga a Pendrive / Disco</h2>
                 <p className="text-xs text-white/50 mt-0.5">{statusLabel}</p>
               </div>
             </div>
@@ -92,8 +97,16 @@ export function DownloadProgressModal({
             )}
           </div>
 
+          {/* Folder destination badge */}
+          {folderName && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white/70">
+              <FolderCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Destino: <strong className="text-white">{folderName}</strong></span>
+            </div>
+          )}
+
           {/* Progress bar */}
-          {status !== "error" && (
+          {status !== "error" && status !== "selecting" && (
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-white/50">
                 <span>{downloaded} / {total} canciones</span>
@@ -101,9 +114,9 @@ export function DownloadProgressModal({
               </div>
               <div className="h-3 rounded-full overflow-hidden bg-white/10">
                 <div
-                  className="h-full rounded-full transition-all duration-300 ease-out"
+                  className="h-full rounded-full transition-all duration-200 ease-out"
                   style={{
-                    width: `${status === "zipping" ? 100 : percent}%`,
+                    width: `${percent}%`,
                     background: status === "done"
                       ? "linear-gradient(90deg, #22c55e, #16a34a)"
                       : "linear-gradient(90deg, #9333ea, #ec4899, #3b82f6)",
@@ -117,23 +130,8 @@ export function DownloadProgressModal({
           {/* Current song */}
           {status === "downloading" && current && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/5">
-              <Music2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              <p className="text-xs text-white/60 truncate">{current}</p>
-            </div>
-          )}
-
-          {status === "zipping" && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/5">
-              <div className="flex gap-1">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-white/60">Generando archivo ZIP en tu navegador...</p>
+              <Music2 className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-pulse" />
+              <p className="text-xs text-white/70 truncate">{current}</p>
             </div>
           )}
 
@@ -144,10 +142,29 @@ export function DownloadProgressModal({
           )}
 
           {status === "done" && (
-            <div className="px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-              <p className="text-xs text-green-400">
-                {total} canciones descargadas. El archivo ZIP se guardará donde elegiste.
-              </p>
+            <div className="space-y-3">
+              <div className="px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                <p className="text-xs text-green-400">
+                  ¡Listo! {total} canciones guardadas y organizadas por Género y Artista directamente en tu carpeta/pendrive.
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full py-2 px-4 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium text-sm transition-colors shadow-lg shadow-green-600/30"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+
+          {status === "downloading" && onCancel && (
+            <div className="pt-2">
+              <button
+                onClick={onCancel}
+                className="w-full py-1.5 px-3 rounded-lg border border-white/10 text-white/40 hover:text-white/80 hover:bg-white/5 text-xs transition-colors"
+              >
+                Detener descarga (las canciones ya guardadas se conservarán)
+              </button>
             </div>
           )}
         </div>

@@ -33,8 +33,6 @@ import WelcomeOverlay from "@/components/welcome-overlay"
 import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DownloadProgressModal } from "@/components/download-progress-modal"
-import JSZip from "jszip"
-import { saveAs } from "file-saver"
 
 interface DeleteSummary {
   totalSongs: number;
@@ -72,8 +70,10 @@ export default function MusicLibrary() {
   const [dlTotal, setDlTotal] = useState(0);
   const [dlDownloaded, setDlDownloaded] = useState(0);
   const [dlCurrent, setDlCurrent] = useState('');
-  const [dlStatus, setDlStatus] = useState<'downloading' | 'zipping' | 'done' | 'error'>('downloading');
+  const [dlFolderName, setDlFolderName] = useState('');
+  const [dlStatus, setDlStatus] = useState<'selecting' | 'downloading' | 'done' | 'error'>('downloading');
   const [dlError, setDlError] = useState('');
+  const cancelDownloadRef = useRef(false);
 
   const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
   const [showOrphanResult, setShowOrphanResult] = useState(false);
@@ -114,16 +114,45 @@ export default function MusicLibrary() {
 
   const handleDownloadAll = async () => {
     if (isDownloadingAll) return;
+
+    // 1. Verificar compatibilidad con File System Access API
+    if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
+      toast.error('Tu navegador no permite guardar carpetas directamente. Por favor utiliza Google Chrome o Microsoft Edge.');
+      return;
+    }
+
+    let dirHandle: any;
+    try {
+      setDlStatus('selecting');
+      setDlFolderName('');
+      setDlDownloaded(0);
+      setDlTotal(0);
+      setDlCurrent('');
+      setDlError('');
+      setDlModalOpen(true);
+
+      // Abre el selector nativo de carpetas de Windows
+      dirHandle = await (window as any).showDirectoryPicker({
+        id: 'lfplayer_pendrive',
+        mode: 'readwrite',
+      });
+      setDlFolderName(dirHandle.name || 'Carpeta seleccionada');
+    } catch (err: any) {
+      setDlModalOpen(false);
+      if (err.name === 'AbortError') {
+        // El usuario canceló la ventana de selección
+        return;
+      }
+      toast.error(`Error al seleccionar carpeta: ${err.message}`);
+      return;
+    }
+
     setIsDownloadingAll(true);
-    setDlDownloaded(0);
-    setDlTotal(0);
-    setDlCurrent('');
-    setDlError('');
+    cancelDownloadRef.current = false;
     setDlStatus('downloading');
-    setDlModalOpen(true);
 
     try {
-      // 1. Obtener lista de canciones del servidor (llamada rápida, solo metadatos)
+      // 2. Obtener lista de canciones del servidor
       const res = await fetch('/api/download-all');
       if (!res.ok) {
         const err = await res.json();
@@ -139,42 +168,64 @@ export default function MusicLibrary() {
           .replace(/[<>:"/\\|?*]+/g, '_')
           .trim();
 
-      // 2. Construir ZIP en el navegador descargando directamente desde R2
-      const zip = new JSZip();
+      // Cache de handles de carpetas para evitar llamadas redundantes
+      const genreDirs = new Map<string, any>();
+      const artistDirs = new Map<string, any>();
 
+      // 3. Descargar y escribir directamente en el pendrive / disco
       for (let i = 0; i < songList.length; i++) {
+        if (cancelDownloadRef.current) {
+          toast.info('Descarga detenida. Las canciones ya guardadas se mantendrán en tu pendrive.');
+          break;
+        }
+
         const song = songList[i];
-        setDlCurrent(`${song.artist} - ${song.title}`);
+        const safeGenre = cleanName(song.genre);
+        const safeArtist = cleanName(song.artist);
+        const safeTitle = cleanName(song.title);
+        setDlCurrent(`${safeArtist} - ${safeTitle}`);
 
         try {
-          const audioRes = await fetch(song.url);
-          if (!audioRes.ok) {
-            console.warn(`Skipping ${song.title}: ${audioRes.statusText}`);
-            continue;
+          // Obtener o crear carpeta del género
+          let gDir = genreDirs.get(safeGenre);
+          if (!gDir) {
+            gDir = await dirHandle.getDirectoryHandle(safeGenre, { create: true });
+            genreDirs.set(safeGenre, gDir);
           }
-          const buffer = await audioRes.arrayBuffer();
-          const path = `${cleanName(song.genre)}/${cleanName(song.artist)}/${cleanName(song.title)}.mp3`;
-          zip.file(path, buffer);
+
+          // Obtener o crear carpeta del artista dentro del género
+          const artistKey = `${safeGenre}___${safeArtist}`;
+          let aDir = artistDirs.get(artistKey);
+          if (!aDir) {
+            aDir = await gDir.getDirectoryHandle(safeArtist, { create: true });
+            artistDirs.set(artistKey, aDir);
+          }
+
+          // Crear archivo de la canción en la carpeta del artista
+          const fileHandle = await aDir.getFileHandle(`${safeTitle}.mp3`, { create: true });
+
+          // Descarga directa desde R2 hacia el archivo en el pendrive
+          const audioRes = await fetch(song.url);
+          if (audioRes.ok) {
+            const writable = await fileHandle.createWritable();
+            if (audioRes.body && 'pipeTo' in audioRes.body) {
+              await audioRes.body.pipeTo(writable);
+            } else {
+              const buf = await audioRes.arrayBuffer();
+              await writable.write(buf);
+              await writable.close();
+            }
+          } else {
+            console.warn(`No se pudo descargar ${song.title}: ${audioRes.statusText}`);
+          }
         } catch (e) {
-          console.warn(`Error descargando ${song.title}:`, e);
+          console.warn(`Error guardando ${song.title}:`, e);
         }
 
         setDlDownloaded(i + 1);
       }
 
-      // 3. Generar el archivo ZIP
-      setDlStatus('zipping');
-      const blob = await zip.generateAsync(
-        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } },
-        (meta) => {
-          // progreso del zip (opcional, ya estamos en 100% de descarga)
-        }
-      );
-
-      // 4. Guardar — abre el explorador de Windows
-      saveAs(blob, 'LFPlayer_BibliotecaCompleta.zip');
       setDlStatus('done');
-
     } catch (e: any) {
       setDlError(e.message || 'Error inesperado');
       setDlStatus('error');
@@ -938,9 +989,13 @@ export default function MusicLibrary() {
         total={dlTotal}
         downloaded={dlDownloaded}
         current={dlCurrent}
+        folderName={dlFolderName}
         status={dlStatus}
         errorMsg={dlError}
         onClose={() => setDlModalOpen(false)}
+        onCancel={() => {
+          cancelDownloadRef.current = true;
+        }}
       />
     </div>
   )
