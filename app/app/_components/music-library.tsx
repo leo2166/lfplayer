@@ -32,6 +32,9 @@ import AddMusicDialog from "@/components/add-music-dialog"
 import WelcomeOverlay from "@/components/welcome-overlay"
 import { Folder, Music, Trash2, Loader2, ChevronDownIcon, Plus, FileCheck, Disc, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { DownloadProgressModal } from "@/components/download-progress-modal"
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 interface DeleteSummary {
   totalSongs: number;
@@ -63,6 +66,14 @@ export default function MusicLibrary() {
   const [showDateDeleteConfirm, setShowDateDeleteConfirm] = useState(false);
 
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  // Estado del modal de progreso
+  const [dlModalOpen, setDlModalOpen] = useState(false);
+  const [dlTotal, setDlTotal] = useState(0);
+  const [dlDownloaded, setDlDownloaded] = useState(0);
+  const [dlCurrent, setDlCurrent] = useState('');
+  const [dlStatus, setDlStatus] = useState<'downloading' | 'zipping' | 'done' | 'error'>('downloading');
+  const [dlError, setDlError] = useState('');
 
   const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
   const [showOrphanResult, setShowOrphanResult] = useState(false);
@@ -102,21 +113,71 @@ export default function MusicLibrary() {
   };
 
   const handleDownloadAll = async () => {
+    if (isDownloadingAll) return;
     setIsDownloadingAll(true);
-    toast.info('Preparando descarga completa... esto puede tardar varios minutos.', { duration: 8000 });
+    setDlDownloaded(0);
+    setDlTotal(0);
+    setDlCurrent('');
+    setDlError('');
+    setDlStatus('downloading');
+    setDlModalOpen(true);
+
     try {
+      // 1. Obtener lista de canciones del servidor (llamada rápida, solo metadatos)
       const res = await fetch('/api/download-all');
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Error al descargar');
+        throw new Error(err.error || 'Error al obtener lista de canciones');
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      triggerDownload(url, 'LFPlayer_BibliotecaCompleta.zip');
-      URL.revokeObjectURL(url);
-      toast.success('¡Descarga completa lista!');
+      const { songs: songList, total } = await res.json();
+      setDlTotal(total);
+
+      const cleanName = (name: string) =>
+        (name || 'Desconocido')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[<>:"/\\|?*]+/g, '_')
+          .trim();
+
+      // 2. Construir ZIP en el navegador descargando directamente desde R2
+      const zip = new JSZip();
+
+      for (let i = 0; i < songList.length; i++) {
+        const song = songList[i];
+        setDlCurrent(`${song.artist} - ${song.title}`);
+
+        try {
+          const audioRes = await fetch(song.url);
+          if (!audioRes.ok) {
+            console.warn(`Skipping ${song.title}: ${audioRes.statusText}`);
+            continue;
+          }
+          const buffer = await audioRes.arrayBuffer();
+          const path = `${cleanName(song.genre)}/${cleanName(song.artist)}/${cleanName(song.title)}.mp3`;
+          zip.file(path, buffer);
+        } catch (e) {
+          console.warn(`Error descargando ${song.title}:`, e);
+        }
+
+        setDlDownloaded(i + 1);
+      }
+
+      // 3. Generar el archivo ZIP
+      setDlStatus('zipping');
+      const blob = await zip.generateAsync(
+        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } },
+        (meta) => {
+          // progreso del zip (opcional, ya estamos en 100% de descarga)
+        }
+      );
+
+      // 4. Guardar — abre el explorador de Windows
+      saveAs(blob, 'LFPlayer_BibliotecaCompleta.zip');
+      setDlStatus('done');
+
     } catch (e: any) {
-      toast.error(`Error: ${e.message}`);
+      setDlError(e.message || 'Error inesperado');
+      setDlStatus('error');
     } finally {
       setIsDownloadingAll(false);
     }
@@ -870,6 +931,17 @@ export default function MusicLibrary() {
       {showWelcomeOverlay && (
         <WelcomeOverlay onClose={handleCloseWelcomeOverlay} />
       )}
+
+      {/* Modal de progreso de descarga */}
+      <DownloadProgressModal
+        isOpen={dlModalOpen}
+        total={dlTotal}
+        downloaded={dlDownloaded}
+        current={dlCurrent}
+        status={dlStatus}
+        errorMsg={dlError}
+        onClose={() => setDlModalOpen(false)}
+      />
     </div>
   )
 }
