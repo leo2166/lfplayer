@@ -200,6 +200,25 @@ onPlay={() => {
 
 ---
 
+## 2026-11-05 11:00 | FIX | showDirectoryPicker ID demasiado largo
+**Síntoma:** Error "ID cannot be longer than 32 characters" al descargar playlist.
+**Causa:** `id: \`lfplayer-playlist-${playlistId}\`` generaba 54 caracteres (UUID incluido).
+**Fix:** Cambiado a `id: "lfplayer-playlist"` (17 caracteres fijos).
+- Archivo: `components/download-playlist-button.tsx`
+- Commit: `0576150`
+
+---
+
+## 2026-11-05 11:28 | FIX | Descarga playlist creaba subcarpetas género/artista
+**Síntoma:** Al descargar playlist "Simplemente Baladas" (35 canciones), se copiaba toda la biblioteca porque usaba la misma estructura `Género/Artista/` que "Descargar Todo" y reutilizaba carpetas existentes.
+**Causa:** La lógica de descarga de playlist era idéntica a la descarga global (con subfolders).
+**Solución:** Estructura plana → `[NombrePlaylist]/[Canción].mp3` directamente, sin subcarpetas.
+- Archivo: `components/download-playlist-button.tsx`
+- Commit: `174ce31`
+- ✅ **Probado y confirmado funcionando por el usuario**
+
+---
+
 ## Próximos pasos planificados (post-fix móvil)
 
 | Prioridad | Tarea | Archivos afectados |

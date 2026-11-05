@@ -7,9 +7,11 @@ Resumen del Proyecto LFPlayer - Estado Actual:
 2. Descarga de Música a Pendrive / Disco:
    - "Descargar Todo": Implementado con File System Access API nativa (`window.showDirectoryPicker`). Abre el explorador de Windows para que el usuario elija su pendrive/disco de destino.
    - Streaming directo a disco/pendrive por canción con liberación inmediata de RAM (soporta 1,669+ canciones / 15GB+ sin colapsos de memoria ni timeouts de servidor).
-   - Estructura automática de carpetas en el pendrive: `[Género]/[Artista]/[Canción].mp3` lista para reproducción en autos, equipos de sonido y TVs.
+   - Estructura automática de carpetas en el pendrive (descarga global): `[Género]/[Artista]/[Canción].mp3` lista para reproducción en autos, equipos de sonido y TVs.
    - Modal Glassmorphism de progreso en tiempo real con contador, porcentaje, canción actual, carpeta destino y botón para detener conservando lo descargado.
    - Endpoint rápido `/api/download-all` que entrega metadatos al cliente sin sobrecargar Vercel Serverless.
+   - "Descargar Playlist": Descarga las canciones de una playlist en una carpeta plana `[NombrePlaylist]/[Canción].mp3` directamente en el pendrive elegido (sin subcarpetas).
+   - Fix aplicado 2026-11-05: `showDirectoryPicker` id recortado a ≤32 chars. Estructura de descarga de playlist cambiada a plana (sin género/artista anidados). ✅ Probado y funcionando.
 
 3. Almacenamiento y Base de Datos:
    - Backend Supabase para metadatos y playlists.
