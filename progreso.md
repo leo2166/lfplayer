@@ -171,6 +171,29 @@ O usar: `DISABLE_PWA=true npm run build` para builds rápidos sin PWA
 
 ---
 
+## 2026-11-05 05:30 | FIX | Reproducción en playlist detail page
+
+### Problema
+Al entrar a una playlist (`/app/playlists/[id]`) y clickear una canción, **no se reproducía** - el `onPlay` del `SongCard` estaba vacío (solo comentario).
+
+### Causa
+`app/app/playlists/[id]/page.tsx` importaba `useMusicPlayer` pero no lo usaba:
+```typescript
+onPlay={() => {
+  // Play this song  ← SOLO COMENTARIO, NO EJECUTA NADA
+}}
+```
+
+### Solución
+1. **Usar hook:** `const { playSong } = useMusicPlayer()`
+2. **Conectar onPlay:** Llama `playSong(song, playlistSongs)` con la queue completa
+3. **Botón "Reproducir Todo":** Ahora funcional (antes estaba `hidden`)
+
+### Archivo modificado
+- `app/app/playlists/[id]/page.tsx` - líneas 29, 124-130, 183-202, 221-232
+
+---
+
 ## Próximos pasos planificados (post-fix móvil)
 
 | Prioridad | Tarea | Archivos afectados |

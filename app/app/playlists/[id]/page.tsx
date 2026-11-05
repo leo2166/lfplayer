@@ -36,6 +36,7 @@ export default function PlaylistDetailPage() {
   const [allUserSongs, setAllUserSongs] = useState<Song[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showAddSongs, setShowAddSongs] = useState(false)
+  const { playSong } = useMusicPlayer()
 
   useEffect(() => {
     const getPlaylistData = async () => {
@@ -184,19 +185,12 @@ export default function PlaylistDetailPage() {
           <Button
             onClick={() => {
               if (playlistSongs.length > 0) {
-                // Assuming useMusicPlayer is available implicitly or we need to add it.
-                // We need to import useMusicPlayer hook first.
-                // For now, let's just emit a console log or standard play if we can't easily hook it up without bigger changes.
-                // BETTER STRATEGY: removing the broken MusicPlayer component is priority. 
-                // I will add a simple "Reproducir Todo" button if I can add the hook, otherwise just remove the section.
-                const event = new CustomEvent('play-playlist', { detail: playlistSongs });
-                window.dispatchEvent(event);
-                // Fallback if we don't want to wire up context right now:
-                // The SongCard onPlay works.
+                playSong(playlistSongs[0], playlistSongs)
               }
             }}
-            className="hidden" // Hiding until we properly wire context
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2"
           >
+            <Music className="w-4 h-4" />
             Reproducir Todo
           </Button>
         </div>
@@ -224,9 +218,10 @@ export default function PlaylistDetailPage() {
                   title={ps.songs.title}
                   artist={ps.songs.artist}
                   duration={ps.songs.duration}
-                  onPlay={() => {
-                    // Play this song
-                  }}
+                  onPlay={() => playSong(
+                    { id: ps.songs.id, title: ps.songs.title, artist: ps.songs.artist, duration: ps.songs.duration, blob_url: ps.songs.blob_url, genre_id: '', user_id: '' },
+                    playlistSongs
+                  )}
                   onDelete={allUserSongs.length > 0 ? () => handleRemoveSong(ps.songs.id) : undefined}
                 />
               ))}
