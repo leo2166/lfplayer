@@ -24,3 +24,16 @@ export interface Genre extends SupabaseTable {
   display_order?: number
   created_by?: string
 }
+
+// Represents a playlist
+export interface Playlist extends SupabaseTable {
+  user_id: string
+  name: string
+  description?: string
+  cover_color?: string
+}
+
+// Represents a playlist with songs
+export interface PlaylistWithSongs extends Playlist {
+  songs: Song[]
+}

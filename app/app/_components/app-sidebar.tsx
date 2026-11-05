@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp, Sun, Moon, Printer } from "lucide-react"
+import { Music, X, ListMusic, PlusCircle, LogOut, FolderUp, Sun, Moon, Printer, ChevronDown, ChevronRight } from "lucide-react"
 import { useTheme } from "next-themes"
 import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { useUserRole } from "@/contexts/UserRoleContext"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useState, useEffect } from "react"
 import PrintReportDialog from "@/components/print-report-dialog"
+import { useMusicLibrary } from "@/contexts/MusicLibraryContext"
+import { DownloadPlaylistButton } from "@/components/download-playlist-button"
 
 interface AppSidebarProps {
     isOpen: boolean
@@ -22,14 +24,21 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
     const pathname = usePathname()
     const userRole = useUserRole()
     const { closePlayer } = useMusicPlayer()
+    const { playlists, fetchPlaylists } = useMusicLibrary()
     const router = useRouter()
     const { theme, setTheme } = useTheme()
     const [isPrintReportOpen, setIsPrintReportOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [showPlaylists, setShowPlaylists] = useState(false)
 
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    // Fetch playlists on mount
+    useEffect(() => {
+        fetchPlaylists()
+    }, [fetchPlaylists])
 
     const isActive = (path: string) => pathname === path
 
@@ -86,7 +95,7 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-2">
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     {navItems.map((item) => {
                         const Icon = item.icon
                         const isActive = pathname === item.href
@@ -108,6 +117,53 @@ export function AppSidebar({ isOpen, onClose, onOpenAddMusic }: AppSidebarProps)
                             </Link>
                         )
                     })}
+
+                    {/* Playlists Section */}
+                    <div className="pt-2 border-t border-border">
+                        <button
+                            onClick={() => setShowPlaylists(!showPlaylists)}
+                            className={cn(
+                                "flex items-center justify-between px-4 py-3 rounded-lg transition-all w-full text-left",
+                                "text-muted-foreground hover:text-foreground hover:bg-accent",
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <ListMusic className="w-5 h-5 flex-shrink-0" />
+                                <span className="font-medium">Mis Playlists</span>
+                            </div>
+                            {showPlaylists ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+
+                        {showPlaylists && (
+                            <div className="mt-2 space-y-1 pl-4">
+                                {playlists.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground py-2">No hay playlists</p>
+                                ) : (
+                                    playlists.map((playlist) => (
+                                        <Link
+                                            key={playlist.id}
+                                            href={`/app/playlists/${playlist.id}`}
+                                            onClick={onClose}
+                                            className={cn(
+                                                "flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors",
+                                                pathname === `/app/playlists/${playlist.id}`
+                                                    ? "bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-600 dark:text-purple-400"
+                                                    : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                                            )}
+                                        >
+                                            <span className="truncate flex-1 mr-2">{playlist.name}</span>
+                                            {userRole === 'admin' && (
+                                                <DownloadPlaylistButton
+                                                    playlistId={playlist.id}
+                                                    playlistName={playlist.name}
+                                                />
+                                            )}
+                                        </Link>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Add Music Button + Print Report (admin only) */}
                     {userRole === 'admin' && (

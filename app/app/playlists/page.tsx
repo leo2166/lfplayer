@@ -12,6 +12,7 @@ import { PlaylistWizard } from "@/components/playlist-wizard"
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useUserRole } from "@/contexts/UserRoleContext"
 import type { Song, Genre } from "@/lib/types"
+import { DownloadPlaylistButton } from "@/components/download-playlist-button"
 
 interface Playlist {
   id: string
@@ -170,17 +171,24 @@ export default function PlaylistsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {playlists.map((playlist) => (
-              <PlaylistCard
-                key={playlist.id}
-                id={playlist.id}
-                name={playlist.name}
-                description={playlist.description}
-                songCount={playlist.song_count || 0}
-                coverColor={playlist.cover_color}
-                onDelete={userRole === 'admin' ? () => handleDeletePlaylist(playlist.id) : undefined}
-                onSelect={() => handlePlaylistSelect(playlist.id)}
-                onPlay={() => handlePlayPlaylist(playlist.id)}
-              />
+              <div key={playlist.id} className="relative">
+                <PlaylistCard
+                  id={playlist.id}
+                  name={playlist.name}
+                  description={playlist.description}
+                  songCount={playlist.song_count || 0}
+                  coverColor={playlist.cover_color}
+                  onDelete={userRole === 'admin' ? () => handleDeletePlaylist(playlist.id) : undefined}
+                  onSelect={() => handlePlaylistSelect(playlist.id)}
+                  onPlay={() => handlePlayPlaylist(playlist.id)}
+                />
+                {userRole === 'admin' && (
+                  <DownloadPlaylistButton
+                    playlistId={playlist.id}
+                    playlistName={playlist.name}
+                  />
+                )}
+              </div>
             ))}
           </div>
         )}

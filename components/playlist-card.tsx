@@ -1,6 +1,6 @@
 "use client"
 
-import { Music, Play, Trash2 } from "lucide-react"
+import { Music, Play, Trash2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface PlaylistCardProps {
@@ -12,6 +12,7 @@ interface PlaylistCardProps {
   onDelete?: () => void
   onSelect: () => void
   onPlay: () => void
+  onDownload?: () => void
 }
 
 export default function PlaylistCard({
@@ -20,9 +21,10 @@ export default function PlaylistCard({
   description,
   songCount,
   coverColor,
-  onDelete, // Make sure onDelete is optional here too
+  onDelete,
   onSelect,
   onPlay,
+  onDownload,
 }: PlaylistCardProps) {
   return (
     <div
@@ -48,7 +50,7 @@ export default function PlaylistCard({
 
       {/* Actions */}
       <div className="absolute top-2 right-2 flex items-center gap-2 transition-opacity">
-        {onDelete && ( // Conditionally render delete button
+        {onDelete && (
           <Button
             size="icon"
             variant="destructive"
@@ -59,6 +61,19 @@ export default function PlaylistCard({
             className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-700"
           >
             <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
+        {onDownload && (
+          <Button
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDownload()
+            }}
+            className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700"
+            title="Descargar playlist"
+          >
+            <Download className="w-4 h-4" />
           </Button>
         )}
         <Button

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Music, Plus } from "lucide-react"
+import { ArrowLeft, Music, Plus, Download } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import SongCard from "@/components/song-card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
+import { useUserRole } from "@/contexts/UserRoleContext"
+import { DownloadPlaylistButton } from "@/components/download-playlist-button"
 
 interface Song {
   id: string
@@ -165,6 +168,12 @@ export default function PlaylistDetailPage() {
               <Plus className="w-4 h-4" />
               Agregar
             </Button>
+          )}
+          {allUserSongs.length > 0 && (
+            <DownloadPlaylistButton
+              playlistId={playlistId}
+              playlistName="playlist"
+            />
           )}
         </div>
       </header>

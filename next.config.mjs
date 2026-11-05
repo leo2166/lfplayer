@@ -10,7 +10,8 @@ const pwaConfig = withPWA({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development', // Deshabilitar PWA en desarrollo para Fast Refresh
+  disable: false, // PWA habilitado también en desarrollo para testear Wake Lock / Media Session en móvil
+  // disable: process.env.DISABLE_PWA === 'true', // Alternativa: variable de entorno para desactivar
 });
 
 /** @type {import('next').NextConfig} */
