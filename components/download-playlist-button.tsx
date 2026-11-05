@@ -75,38 +75,20 @@ export function DownloadPlaylistButton({
 
       const safePlaylistName = cleanName(serverPlaylistName || playlistName)
 
-      // Cache de handles de carpetas para evitar llamadas redundantes
-      const genreDirs = new Map<string, FileSystemDirectoryHandle>()
-      const artistDirs = new Map<string, FileSystemDirectoryHandle>()
+      // Crear una sola carpeta con el nombre de la playlist
+      const playlistDir = await dirHandle.getDirectoryHandle(safePlaylistName, { create: true })
 
-      // 2. Descargar y escribir directamente en la carpeta seleccionada
+      // 2. Descargar todas las canciones directo en esa carpeta (sin subcarpetas)
       for (let i = 0; i < songList.length; i++) {
         const song = songList[i]
-        const safeGenre = cleanName(song.genre)
-        const safeArtist = cleanName(song.artist || "Desconocido")
         const safeTitle = cleanName(song.title)
-        
+
         setStatus("downloading")
         setProgress(5 + Math.round((i / songList.length) * 90))
 
         try {
-          // Obtener o crear carpeta del género
-          let gDir = genreDirs.get(safeGenre)
-          if (!gDir) {
-            gDir = await dirHandle.getDirectoryHandle(safeGenre, { create: true })
-            genreDirs.set(safeGenre, gDir)
-          }
-
-          // Obtener o crear carpeta del artista dentro del género
-          const artistKey = `${safeGenre}___${safeArtist}`
-          let aDir = artistDirs.get(artistKey)
-          if (!aDir) {
-            aDir = await gDir.getDirectoryHandle(safeArtist, { create: true })
-            artistDirs.set(artistKey, aDir)
-          }
-
-          // Crear archivo de la canción en la carpeta del artista
-          const fileHandle = await aDir.getFileHandle(`${safeTitle}.mp3`, { create: true })
+          // Crear archivo directamente dentro de la carpeta de la playlist
+          const fileHandle = await playlistDir.getFileHandle(`${safeTitle}.mp3`, { create: true })
 
           // Descarga directa desde R2 hacia el archivo en el disco
           const audioRes = await fetch(song.url)
