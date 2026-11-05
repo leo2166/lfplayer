@@ -62,13 +62,15 @@ export function DownloadPlaylistButton({
     setStatus("downloading")
 
     try {
+      console.log(`[CLIENT] Downloading playlist: ${playlistId} - ${playlistName}`);
       // 1. Obtener lista de canciones de la playlist
       const res = await fetch(`/api/playlists/${playlistId}/download`)
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || "Error al obtener lista de canciones")
       }
-      const { songs: songList, playlistName: serverPlaylistName } = await res.json()
+      const { songs: songList, playlistName: serverPlaylistName, total } = await res.json()
+      console.log(`[CLIENT] Received ${songList?.length || 0} songs (total: ${total}) for playlist: ${serverPlaylistName}`);
       setProgress(5)
 
       const safePlaylistName = cleanName(serverPlaylistName || playlistName)

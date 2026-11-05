@@ -32,6 +32,8 @@ export async function GET(
             );
         }
 
+        console.log(`[DOWNLOAD API] playlistId received: ${playlistId}`);
+
         // Obtener canciones de la playlist con sus URLs directas
         const { data: playlistSongs, error: songsError } = await supabaseAdmin
             .from("playlist_songs")
@@ -49,6 +51,11 @@ export async function GET(
             .order("position", { ascending: true });
 
         if (songsError) throw songsError;
+
+        console.log(`[DOWNLOAD API] playlistSongs count: ${playlistSongs?.length || 0}`);
+        if (playlistSongs && playlistSongs.length > 0) {
+            console.log(`[DOWNLOAD API] First song: ${playlistSongs[0].songs?.title}, genre: ${playlistSongs[0].songs?.genres?.name}`);
+        }
 
         if (!playlistSongs || playlistSongs.length === 0) {
             return NextResponse.json({ error: "No songs in playlist" }, { status: 404 });
