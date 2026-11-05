@@ -46,7 +46,7 @@ export function DownloadPlaylistButton({
       onDownloadStart?.()
 
       dirHandle = await (window as any).showDirectoryPicker({
-        id: `lfplayer-playlist-${playlistId}`,
+        id: "lfplayer-playlist",
         mode: "readwrite",
       })
     } catch (err: any) {

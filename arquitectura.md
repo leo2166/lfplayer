@@ -301,6 +301,7 @@ ngrok http 3000                   # Túnel HTTPS → https://xxx.ngrok-free.app
 1. **Layout fetch ALL songs** - Sin paginación, rompe con 10k+ canciones
 2. **God Component** - `music-library.tsx` 1000+ líneas, 30+ useState
 3. ~~**Audio player duplicado** - Dos `<audio>` elements, race conditions~~ ✅ **FIXED 2026-11-05** - Un solo `<audio>` ref, Wake Lock + Media Session API
+4. ~~**Playlist detail no reproduce** - `onPlay` vacío en SongCard~~ ✅ **FIXED 2026-11-05** - Conectado `useMusicPlayer.playSong()` con queue completa
 4. **Context re-renders** - `contextValue` nuevo cada render
 5. **Sin React Query/SWR** - Refetch manual con `router.refresh()`
 6. **Admin por email** - Hardcoded `lucidio` en vez de RBAC real
