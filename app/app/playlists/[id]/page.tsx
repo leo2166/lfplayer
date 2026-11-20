@@ -12,6 +12,7 @@ import { useMusicPlayer } from "@/contexts/MusicPlayerContext"
 import { useUserRole } from "@/contexts/UserRoleContext"
 import { DownloadPlaylistButton } from "@/components/download-playlist-button"
 
+
 interface Song {
   id: string
   title: string
@@ -37,6 +38,7 @@ export default function PlaylistDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showAddSongs, setShowAddSongs] = useState(false)
   const { playSong } = useMusicPlayer()
+  const isAdmin = useUserRole() === 'admin'
 
   useEffect(() => {
     const getPlaylistData = async () => {
@@ -160,8 +162,8 @@ export default function PlaylistDetailPage() {
               Playlist
             </h1>
           </div>
-          {/* Only show Add button if we have permission/songs loaded, implying admin/user */}
-          {allUserSongs.length > 0 && songs.length < allUserSongs.length && (
+          {/* Solo admin puede agregar canciones */}
+          {isAdmin && allUserSongs.length > 0 && songs.length < allUserSongs.length && (
             <Button
               onClick={() => setShowAddSongs(true)}
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 gap-2"
@@ -170,7 +172,8 @@ export default function PlaylistDetailPage() {
               Agregar
             </Button>
           )}
-          {allUserSongs.length > 0 && (
+          {/* Solo admin puede descargar */}
+          {isAdmin && (
             <DownloadPlaylistButton
               playlistId={playlistId}
               playlistName="playlist"
@@ -201,7 +204,8 @@ export default function PlaylistDetailPage() {
             <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
               <Music className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
               <p className="text-muted-foreground mb-4">No hay canciones en esta playlist</p>
-              {allUserSongs.length > 0 && (
+              {/* Solo admin puede agregar canciones */}
+              {isAdmin && allUserSongs.length > 0 && (
                 <Button
                   onClick={() => setShowAddSongs(true)}
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
@@ -222,7 +226,7 @@ export default function PlaylistDetailPage() {
                     { id: ps.songs.id, title: ps.songs.title, artist: ps.songs.artist, duration: ps.songs.duration, blob_url: ps.songs.blob_url, genre_id: '', user_id: '' },
                     playlistSongs
                   )}
-                  onDelete={allUserSongs.length > 0 ? () => handleRemoveSong(ps.songs.id) : undefined}
+                  onDelete={isAdmin ? () => handleRemoveSong(ps.songs.id) : undefined}
                 />
               ))}
             </div>
